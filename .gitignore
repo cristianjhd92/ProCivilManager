@@ -1,0 +1,34 @@
+# -----------------------
+# GENERAL
+# -----------------------
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# -----------------------
+# FRONTEND - Create React App
+# -----------------------
+FrontEnd/node_modules/
+FrontEnd/build/
+FrontEnd/.env
+FrontEnd/.env.*.local
+
+# Editor/IDE (opcional pero recomendable)
+FrontEnd/.idea/
+FrontEnd/.vscode/
+
+# -----------------------
+# BACKEND - Node.js + Express
+# -----------------------
+BackEnd/node_modules/
+BackEnd/dist/
+BackEnd/.env
+BackEnd/.env.*.local
+BackEnd/.idea/
+BackEnd/.vscode/
+
+# -----------------------
+# RAÍZ (por si hay .env o node_modules ahí también)
+.env
+.env.*.local
