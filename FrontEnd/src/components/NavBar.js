@@ -72,7 +72,7 @@ const Header = () => {
   return (
     <nav
       className={`fixed top-0 w-full py-4 z-50 transition-all duration-300 navbar-container ${
-        isScrolled ? 'bg-slate-900/98 backdrop-blur-xl' : 'bg-slate-900/95 backdrop-blur-xl'
+        isScrolled ? 'bg-slate-900 backdrop-blur-xl' : 'bg-slate-900/95 backdrop-blur-xl'
       } border-b border-white/10`}
     >
       <div className="max-w-6xl mx-auto flex justify-between items-center px-8">
@@ -207,10 +207,10 @@ const Header = () => {
 
       {/* Mobile Menu */}
       <div
-        className={`md:hidden absolute top-full left-0 w-full bg-slate-900/98 backdrop-blur-xl border-t border-white/10 transition-all duration-300 ${
+        className={`md:hidden absolute top-full left-0 w-full bg-slate-900 backdrop-blur-xl border-t border-white/10 transition-all duration-300 ${
           isMenuOpen
             ? 'opacity-100 visible transform translate-y-0'
-            : 'opacity-0 invisible transform -translate-y-4'
+            : 'opacity-0 transform -translate-y-4'
         }`}
         style={{ boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)' }}
       >
