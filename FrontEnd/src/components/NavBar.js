@@ -84,7 +84,7 @@ const Header = () => {
         >
           <span className="text-2xl">🏗️</span>
           <span className="bg-gradient-to-r from-orange-500 to-orange-400 bg-clip-text text-transparent">
-            SGPCMD
+            Procivil Manager
           </span>
         </Link>
 
