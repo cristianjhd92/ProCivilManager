@@ -111,31 +111,29 @@ npm run dev
 npm start
 ```
 
-### 4.2 FrontEnd – librerías primero
-Instala las dependencias que **sí se usan**:
+### 4.2 FrontEnd – librerías primero _(sin warnings, sin CRA)_
+
+> **Requisito:** Node.js ≥ 20.x  
+
+#### Comandos
 ```bash
 cd FrontEnd
-npm install @testing-library jspdf jspdf-autotable lucide-react react react-dom react-router-dom react-scripts recharts
-```
+npm init -y
 
-Dependencias de **desarrollo** (Tailwind y Testing):
-```bash
-npm install -D @testing-library/jest-dom @testing-library/react autoprefixer postcss tailwindcss
-```
+# Runtime
+npm install react@19.1.1 react-dom@19.1.1 react-router-dom@7.9.3 recharts@3.2.1 lucide-react@0.544.0 jspdf@3.0.3 jspdf-autotable@5.0.2 web-vitals@5.1.0
 
-FrontEnd/tailwind.config.js y postcss.config.js.
+# Dev (build, Tailwind y Testing)
+npm install -D vite@7.1.7 @vitejs/plugin-react@5.0.4 tailwindcss@3 postcss@8.5.6 autoprefixer@10.4.21 vitest@3.2.4 jsdom@27.0.0 @testing-library/react@16.3.0 @testing-library/jest-dom@6.8.0 @testing-library/user-event@14.6.1 @testing-library/dom@10.4.0
 
-Variables del FrontEnd:
-```ini
-REACT_APP_API_URL=http://localhost:5000
-PORT=3000
-```
-> En CRA, las variables que se exponen deben iniciar con `REACT_APP_`.
+# Inicializar Tailwind
+npx tailwindcss init -p
 
-Ejecutar:
-```bash
-npm start
-```
+# Ejecutar
+npx vite --port 3000
+
+# Pruebas
+npx vitest
 
 ---
 

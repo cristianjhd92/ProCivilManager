@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/NavBar';
-import Footer from '../components/Fotter';
+import Fotter from '../components/Fotter';
+
 
 const ProjectRegistrationForm = () => {
   const [formData, setFormData] = useState({

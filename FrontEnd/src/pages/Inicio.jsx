@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/NavBar';
-import Footer from '../components/Fotter';
+import Fotter from '../components/Fotter';
 
 const HomePage = () => {
   const [visibleSections, setVisibleSections] = useState(new Set());
@@ -211,7 +211,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      <Footer />
+      <Fotter />
 
       {/* Custom Styles for animations */}
       <style jsx>{`
