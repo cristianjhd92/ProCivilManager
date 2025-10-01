@@ -106,9 +106,7 @@ Variables requeridas (revísalas en tu `.env`):
 
 Ejecutar:
 ```bash
-npm run dev
-# o
-npm start
+npx nodemon
 ```
 
 ### 4.2 FrontEnd – librerías primero _(sin warnings, sin CRA)_
@@ -119,21 +117,32 @@ npm start
 ```bash
 cd FrontEnd
 npm init -y
+```
 
-# Runtime
+Instala las dependencias que **sí se usan**:
+```bash
 npm install react@19.1.1 react-dom@19.1.1 react-router-dom@7.9.3 recharts@3.2.1 lucide-react@0.544.0 jspdf@3.0.3 jspdf-autotable@5.0.2 web-vitals@5.1.0
+```
 
-# Dev (build, Tailwind y Testing)
+Dev (build, Tailwind y Testing)
+```bash
 npm install -D vite@7.1.7 @vitejs/plugin-react@5.0.4 tailwindcss@3 postcss@8.5.6 autoprefixer@10.4.21 vitest@3.2.4 jsdom@27.0.0 @testing-library/react@16.3.0 @testing-library/jest-dom@6.8.0 @testing-library/user-event@14.6.1 @testing-library/dom@10.4.0
+```
 
-# Inicializar Tailwind
+Inicializar Tailwind
+```bash
 npx tailwindcss init -p
+```
 
-# Ejecutar
-npx vite --port 3000
+Ejecutar
+```bash
+npx vite
+```
 
-# Pruebas
+Pruebas
+```bash
 npx vitest
+```
 
 ---
 
