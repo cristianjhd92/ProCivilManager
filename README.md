@@ -17,7 +17,6 @@ Gestor integral para empresas de ingeniería y construcción en Colombia. Monore
 
 ### BackEnd/
 ```
-.env
 .env.example
 config/db.js
 controllers/ProyectosController.js
