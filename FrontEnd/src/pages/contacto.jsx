@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/NavBar';
-import Footer from '../components/Fotter';
+import Fotter from '../components/Fotter';
 
 const ContactPage = () => {
   const [visibleSections, setVisibleSections] = useState(new Set());
@@ -361,7 +361,7 @@ const ContactPage = () => {
         </div>
       </section>
 
-      <Footer />
+      <Fotter />
 
       {/* Custom Styles */}
       <style jsx>{`

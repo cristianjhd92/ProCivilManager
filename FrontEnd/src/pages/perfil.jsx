@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/NavBar';
-import Footer from '../components/Fotter';
+import Fotter from '../components/Fotter';
 
 const Perfil = () => {
   const [activeTab, setActiveTab] = useState('info');
@@ -374,7 +374,7 @@ const Perfil = () => {
           </div>
         </div>
       </section>
-    <Footer />
+    <Fotter />
     </div>
   );
 };

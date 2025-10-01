@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Header from '../components/NavBar';
-import Footer from '../components/Fotter';
+import Fotter from '../components/Fotter';
 
 const ConstructionHistory = () => {
   const [projects, setProjects] = useState([]);
@@ -386,7 +386,7 @@ const ConstructionHistory = () => {
         </div>
       </div>
 
-      < Footer />
+      < Fotter />
       <style jsx>{`
         @keyframes blob {
           0% { transform: translate(0px, 0px) scale(1); }

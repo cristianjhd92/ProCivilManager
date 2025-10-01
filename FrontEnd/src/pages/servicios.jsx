@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/NavBar';
-import Footer from '../components/Fotter';
+import Fotter from '../components/Fotter';
 
 const ServicesPage = () => {
   const [visibleSections, setVisibleSections] = useState(new Set());
@@ -280,7 +280,7 @@ const ServicesPage = () => {
         </div>
       </section>
 
-    < Footer />
+    < Fotter />
 
       {/* Custom Styles */}
       <style jsx>{`

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/NavBar';
-import Footer from '../components/Fotter';
+import Fotter from '../components/Fotter';
 
 const Proyectos = () => {
   const [projects, setProjects] = useState([]);
@@ -287,7 +287,7 @@ const Proyectos = () => {
         )}
       </section>
 
-      <Footer />
+      <Fotter />
     </div>
   );
 };
