@@ -1,34 +1,83 @@
-# -----------------------
-# GENERAL
-# -----------------------
-node_modules/
-*.log
+# =============================================================
+# .gitignore – Procivil Manager (PCM)
+# Monorepo: BackEnd (Node/Express) + FrontEnd (React/CRA)
+# =============================================================
+
+# ------------------------------
+# Sistema operativo / editores
+# ------------------------------
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
+*.orig
+.idea/
+.vscode/
+*.iml
 
-# -----------------------
-# FRONTEND - Create React App
-# -----------------------
-FrontEnd/node_modules/
-FrontEnd/build/
-FrontEnd/.env
-FrontEnd/.env.*.local
+# ------------------------------
+# Node.js (ambos: BackEnd/FrontEnd)
+# ------------------------------
+**/node_modules/
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Editor/IDE (opcional pero recomendable)
-FrontEnd/.idea/
-FrontEnd/.vscode/
+# PIDs / runtime
+pids/
+*.pid
+*.seed
+*.pid.lock
 
-# -----------------------
-# BACKEND - Node.js + Express
-# -----------------------
-BackEnd/node_modules/
-BackEnd/dist/
-BackEnd/.env
-BackEnd/.env.*.local
-BackEnd/.idea/
-BackEnd/.vscode/
+# Paquetes generados por npm pack
+*.tgz
 
-# -----------------------
-# RAÍZ (por si hay .env o node_modules ahí también)
-.env
-.env.*.local
+# Coverage / reportes de pruebas
+coverage/
+**/coverage/
+.nyc_output/
+**/.nyc_output/
+# Cache de Jest / ESLint
+**/jest-cache/
+**/jest-transform-cache/
+**/.eslintcache
+
+# Builds / bundles / caches de herramientas
+**/dist/
+**/build/
+**/.cache/
+**/.parcel-cache/
+**/.vite/
+# (otros frameworks)
+**/.next/
+**/.nuxt/
+**/.svelte-kit/
+
+# TypeScript (si se llegará a usar)
+**/*.tsbuildinfo
+
+# ------------------------------
+# Subidas/temporales (ajustar si cambias rutas)
+# ------------------------------
+BackEnd/uploads/
+**/tmp/
+**/temp/
+**/.tmp/
+
+# ------------------------------
+# PDFs/Reportes generados (ajustar si no aplica)
+# ------------------------------
+BackEnd/reports/
+BackEnd/pdfs/
+FrontEnd/pdfs/
+
+# ------------------------------
+# Lockfiles (NO IGNORAR)
+# ------------------------------
+# Mantenerlos versionados para reproducibilidad:
+#   package-lock.json  /  pnpm-lock.yaml  /  yarn.lock
