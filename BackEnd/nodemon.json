@@ -1,0 +1,7 @@
+{
+  "watch": ["."],
+  "ext": "js,json",
+  "ignore": ["node_modules", "../FrontEnd", "dist", "build"],
+  "env": { "PORT": "5000" },
+  "exec": "node server.js"
+}
