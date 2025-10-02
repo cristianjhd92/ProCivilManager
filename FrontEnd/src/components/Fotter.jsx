@@ -11,7 +11,7 @@ const Fotter = () => {
   };
 
   return (
-    <fotter className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
+    <fotter className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-black overflow-hidden">
       {/* Background Pattern */}
       <div 
         className="absolute inset-0 opacity-50"
@@ -31,7 +31,7 @@ const Fotter = () => {
               Procivil Manager
               </span>
             </div>
-            <p className="text-white/70 mb-6 leading-relaxed">
+            <p className="text-black/70 mb-6 leading-relaxed">
               La plataforma líder en gestión de proyectos de construcción. Transformamos la manera en que planificas, ejecutas y entregas tus proyectos.
             </p>
             <div className="flex gap-4">
@@ -39,7 +39,7 @@ const Fotter = () => {
                 <a
                   key={index}
                   href="#"
-                  className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center text-white transition-all duration-300 hover:bg-orange-500 hover:-translate-y-1"
+                  className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center text-black transition-all duration-300 hover:bg-orange-500 hover:-translate-y-1"
                 >
                   {icon}
                 </a>
@@ -58,7 +58,7 @@ const Fotter = () => {
                 { icon: '📞', text: '+57 (1) 234-5678' },
                 { icon: '📍', text: 'Bogotá, Colombia' }
               ].map((contact, index) => (
-                <div key={index} className="flex items-center gap-3 text-white/70">
+                <div key={index} className="flex items-center gap-3 text-black/70">
                   <div className="w-9 h-9 bg-orange-500/20 rounded-lg flex items-center justify-center text-sm">
                     {contact.icon}
                   </div>
@@ -70,7 +70,7 @@ const Fotter = () => {
             {/* Newsletter */}
             <div className="bg-white/5 backdrop-blur-sm p-6 rounded-2xl border border-white/10">
               <h4 className="text-lg font-semibold mb-2">Newsletter</h4>
-              <p className="text-sm text-white/70 mb-4">
+              <p className="text-sm text-black/70 mb-4">
                 Recibe las últimas noticias y actualizaciones
               </p>
               <div className="space-y-2">
@@ -79,7 +79,7 @@ const Fotter = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Tu email"
-                  className="w-full px-3 py-2 bg-white/10 border-none rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-3 py-2 bg-white/10 border-none rounded-lg text-black placeholder-black/50 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
                 <button
                   onClick={handleNewsletterSubmit}
@@ -94,7 +94,7 @@ const Fotter = () => {
 
         {/* fotter Bottom */}
         <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="text-white/60 text-sm">
+          <div className="text-black/60 text-sm">
             © 2024 ProBuild. Todos los derechos reservados.
           </div>
           <div className="flex flex-col md:flex-row gap-4 md:gap-8">
@@ -102,7 +102,7 @@ const Fotter = () => {
               <a
                 key={index}
                 href="#"
-                className="text-white/60 text-sm transition-colors duration-300 hover:text-orange-400"
+                className="text-black/60 text-sm transition-colors duration-300 hover:text-orange-400"
               >
                 {item}
               </a>
