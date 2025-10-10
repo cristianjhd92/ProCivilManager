@@ -23,7 +23,7 @@ const userSchema = new Schema(                                                  
     email: {                                                                     // Correo electrónico (clave de login)
       type: String,                                                              // Tipo String
       required: true,                                                            // Obligatorio
-      // ⚠️ Importante: NO poner unique: true aquí para evitar doble índice       // Evita que Mongoose cree un índice adicional
+      // Importante: NO poner unique: true aquí para evitar doble índice         // Evita que Mongoose cree un índice adicional
       lowercase: true,                                                           // Normaliza a minúsculas
       trim: true,                                                                // Recorta espacios
       validate: {                                                                // Validador simple de formato

@@ -60,7 +60,7 @@ const ProyectoSchema = new Schema({                                             
     // errores de validación (antes se usaba 'planning' por defecto).             // Explicación del porqué
     enum: ['planning', 'in-progress', 'paused', 'done', 'canceled'],             // Estatus válidos (EN)
     default: 'planning'                                                          // Valor por defecto (EN)
-    // ⚠️ NO poner index: true aquí para evitar un índice duplicado de status     // Evita duplicidad de índices
+    // NO poner index: true aquí para evitar un índice duplicado de status       // Evita duplicidad de índices
   },
   startDate: {                                                                   // Fecha de inicio
     type: Date                                                                   // Tipo fecha
