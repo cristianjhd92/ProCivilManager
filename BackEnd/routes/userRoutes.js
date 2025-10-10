@@ -1,74 +1,80 @@
-// File: BackEnd/routes/userRoutes.js                                             
-// Descripción: Rutas de usuarios protegidas con JWT y autorización por roles. 
-// - Endpoints públicos: register, login, forgot/reset password
-// - Endpoints autenticados: perfil y cambio de password
-// - Endpoints administrativos: listar/actualizar/eliminar usuarios con roles
+// File: BackEnd/routes/userRoutes.js                                             // Ruta del archivo dentro del proyecto
+// Descripción: Rutas de usuarios protegidas con JWT y autorización por roles.    // Propósito del router
+// - Endpoints públicos: register, login, forgot/reset password                   // Alcance (públicos)
+// - Endpoints autenticados: perfil y cambio de password                          // Alcance (autenticados)
+// - Endpoints administrativos: listar/actualizar/eliminar usuarios con roles     // Alcance (admin)
 
-const express = require('express');                                              // Importa express para crear el router
-const router = express.Router();                                                 // Crea una instancia de router de Express
+// -----------------------------------------------------------------------------
+// Imports y setup
+// -----------------------------------------------------------------------------
+const express = require('express');                                              // Importa express para crear routers HTTP
+const router = express.Router();                                                 // Instancia un router modular de Express
 
-// Importa los controladores de usuario                                          // Controladores que contienen la lógica de cada ruta
+// Importa controladores de usuario (lógica de cada endpoint)                    // Reúne handlers en un solo require
 const {
-  register,                                                                      // Controlador para registrar un usuario
-  login,                                                                         // Controlador para iniciar sesión
-  forgotPassword,                                                                // Controlador para solicitar recuperación de contraseña
-  resetPassword,                                                                 // Controlador para restablecer contraseña con token
-  getUserProfile,                                                                // Controlador para obtener el perfil del usuario autenticado
-  updateUserProfile,                                                             // Controlador para actualizar el perfil del usuario autenticado
-  updateUserPassword,                                                            // Controlador para cambiar la contraseña del usuario autenticado
-  getAllUsers,                                                                   // Controlador para listar todos los usuarios (administrativo)
-  updateUserById,                                                                // Controlador para actualizar un usuario por su id
-  deleteUserById                                                                 // Controlador para eliminar un usuario por su id
-} = require('../controllers/userController');                                    // Importa desde el archivo de controladores de usuario
+  register,                                                                      // Handler: registrar usuario nuevo
+  login,                                                                         // Handler: iniciar sesión (devuelve JWT)
+  forgotPassword,                                                                // Handler: solicitar email de recuperación
+  resetPassword,                                                                 // Handler: restablecer contraseña con token
+  getUserProfile,                                                                // Handler: obtener perfil del usuario autenticado
+  updateUserProfile,                                                             // Handler: actualizar datos del perfil propio
+  updateUserPassword,                                                            // Handler: cambiar contraseña del usuario autenticado
+  getAllUsers,                                                                   // Handler: (admin) listar usuarios
+  updateUserById,                                                                // Handler: (admin) actualizar usuario por id
+  deleteUserById                                                                 // Handler: (admin) eliminar usuario por id
+} = require('../controllers/userController');                                    // Carga desde controllers/userController.js
 
-// Importa middlewares de autenticación y autorización                           // authMiddleware valida JWT, requireRole limita por rol
-const { authMiddleware, requireRole } = require('../middleware/authMiddleware'); // Importa los middlewares
-
-// -----------------------------------------------------------------------------
-// Rutas públicas (no requieren autenticación)                                   // Sección de rutas abiertas al público
-// -----------------------------------------------------------------------------
-router.post('/register', register);                                              // POST /register → registrar usuario
-router.post('/login', login);                                                    // POST /login → iniciar sesión y obtener token
-router.post('/forgot-password', forgotPassword);                                 // POST /forgot-password → solicitar recuperación
-router.post('/reset-password/:token', resetPassword);                            // POST /reset-password/:token → confirmar recuperación
+// Importa middlewares de auth/roles                                              // Protegen rutas y restringen por rol
+const { authMiddleware, requireRole } = require('../middleware/authMiddleware'); // authMiddleware valida JWT; requireRole valida rol
 
 // -----------------------------------------------------------------------------
-// Rutas protegidas (requieren autenticación con JWT)                            // Sección de rutas disponibles para usuarios logueados
+// Rutas públicas (no requieren autenticación)
 // -----------------------------------------------------------------------------
-router.get('/me', authMiddleware, getUserProfile);                               // GET /me → obtener perfil del usuario autenticado
-router.put('/me', authMiddleware, updateUserProfile);                            // PUT /me → actualizar perfil del usuario autenticado
-router.put('/me/password', authMiddleware, updateUserPassword);                  // PUT /me/password → cambiar contraseña del usuario autenticado
+router.post('/register', register);                                              // POST /api/user/register → crea usuario
+router.post('/login', login);                                                    // POST /api/user/login → autentica y retorna token
+router.post('/forgot-password', forgotPassword);                                 // POST /api/user/forgot-password → envía correo de reset
+router.post('/reset-password/:token', resetPassword);                            // POST /api/user/reset-password/:token → aplica reset
 
 // -----------------------------------------------------------------------------
-// Rutas administrativas (requieren rol autorizado)                              // Sección de rutas restringidas a roles específicos
-// Roles sugeridos: 'admin' y 'lider de obra'                                    // Política de roles recomendada
+// Rutas protegidas (requieren autenticación con JWT)
 // -----------------------------------------------------------------------------
-router.get(                                                                      // GET /users → listar todos los usuarios
-  '/users',                                                                      // Endpoint de la ruta
-  authMiddleware,                                                                // Requiere autenticación JWT
-  requireRole('admin', 'lider de obra'),                                         // Solo admin y líder de obra pueden acceder
-  getAllUsers                                                                    // Controlador que lista usuarios
+router.get('/me', authMiddleware, getUserProfile);                               // GET /api/user/me → datos del usuario (sin campos sensibles)
+router.put('/me', authMiddleware, updateUserProfile);                            // PUT /api/user/me → actualiza nombre, email, phone, etc.
+router.put('/me/password', authMiddleware, updateUserPassword);                  // PUT /api/user/me/password → cambia la contraseña
+
+// -----------------------------------------------------------------------------
+// Rutas administrativas (requieren rol autorizado)
+// Sugerido: 'admin' y 'lider de obra'                                           // Política de acceso por roles
+// -----------------------------------------------------------------------------
+router.get(                                                                      // GET /api/user/users → lista usuarios
+  '/users',                                                                      // Path del endpoint
+  authMiddleware,                                                                // Requiere JWT válido
+  requireRole('admin', 'lider de obra'),                                         // Solo roles permitidos
+  getAllUsers                                                                    // Handler que devuelve la lista
 );
 
-router.put(                                                                      // PUT /users/:id → actualizar un usuario completo
-  '/users/:id',                                                                  // Endpoint con parámetro id de usuario
-  authMiddleware,                                                                // Requiere autenticación JWT
-  requireRole('admin', 'lider de obra'),                                         // Solo admin y líder de obra autorizados
-  updateUserById                                                                 // Controlador que actualiza el usuario
+router.put(                                                                      // PUT /api/user/users/:id → reemplazo/actualización completa
+  '/users/:id',                                                                  // Path con parámetro de ruta :id
+  authMiddleware,                                                                // Requiere JWT válido
+  requireRole('admin', 'lider de obra'),                                         // Solo roles permitidos
+  updateUserById                                                                 // Handler que actualiza el usuario destino
 );
 
-router.patch(                                                                    // PATCH /users/:id → actualización parcial
-  '/users/:id',                                                                  // Endpoint con parámetro id de usuario
-  authMiddleware,                                                                // Requiere autenticación JWT
-  requireRole('admin', 'lider de obra'),                                         // Solo admin y líder de obra autorizados
-  updateUserById                                                                 // Controlador que realiza la actualización parcial
+router.patch(                                                                    // PATCH /api/user/users/:id → actualización parcial
+  '/users/:id',                                                                  // Path con parámetro :id
+  authMiddleware,                                                                // Requiere JWT válido
+  requireRole('admin', 'lider de obra'),                                         // Solo roles permitidos
+  updateUserById                                                                 // Reusa el mismo handler (admite parches)
 );
 
-router.delete(                                                                   // DELETE /users/:id → eliminar un usuario
-  '/users/:id',                                                                  // Endpoint con parámetro id de usuario
-  authMiddleware,                                                                // Requiere autenticación JWT
-  requireRole('admin', 'lider de obra'),                                         // Solo admin y líder de obra autorizados
-  deleteUserById                                                                 // Controlador que elimina al usuario
+router.delete(                                                                   // DELETE /api/user/users/:id → elimina usuario
+  '/users/:id',                                                                  // Path con parámetro :id
+  authMiddleware,                                                                // Requiere JWT válido
+  requireRole('admin', 'lider de obra'),                                         // Solo roles permitidos
+  deleteUserById                                                                 // Handler que elimina al usuario
 );
 
-module.exports = router;                                                         // Exporta el router para ser usado en el servidor principal
+// -----------------------------------------------------------------------------
+// Exportación del router
+// -----------------------------------------------------------------------------
+module.exports = router;                                                         // Exporta para montarlo en server.js (prefijo /api/user)

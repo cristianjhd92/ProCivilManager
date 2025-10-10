@@ -23,23 +23,41 @@ const toDateOrNull = (value) => {                                               
 };                                                                                  // Cierra toDateOrNull
 
 // ===== Estados: aceptar ES/EN y guardar en EN canónico (enum del Schema) =====   // Normalización de status
-const STATUS_MAP = {                                                                // Mapa de equivalencias ES → EN
-  'borrador': 'planning',
-  'en progreso': 'in_progress',
-  'en pausa': 'paused',
-  'completado': 'completed',
-  'cancelado': 'cancelled'
-};                                                                                  // Fin STATUS_MAP
+const STATUS_CANONICALS = Proyectos.schema.path('status')?.enumValues || [];        // Enum real del modelo (p.ej. ['planning','in-progress','paused','done','canceled'])
 
-const ALLOWED_STATUS = Proyectos.schema.path('status')?.enumValues || [];           // Lee enum del Schema (EN canónico)
-const normalizeStatus = (s) => {                                                    // Normaliza valor recibido
-  if (typeof s === 'undefined' || s === null) return undefined;                     // Si no viene, deja undefined
-  const key = String(s).toLowerCase().trim();                                       // Lower + trim
-  return STATUS_MAP[key] || key;                                                    // Si es ES → EN; si ya es EN, lo deja igual
+// Mapa de alias (ES y variantes EN) → valor canónico del modelo                   // Permite inputs flexibles del front
+const STATUS_ALIASES = {                                                            // Tabla de equivalencias
+  // ---- Español → Inglés canónico ----
+  'borrador': 'planning',
+  'en progreso': 'in-progress',
+  'en_progreso': 'in-progress',
+  'en-progreso': 'in-progress',
+  'en pausa': 'paused',
+  'en_pausa': 'paused',
+  'completado': 'done',
+  'finalizado': 'done',
+  'cancelado': 'canceled',
+
+  // ---- Inglés variantes → Inglés canónico ----
+  'planning': 'planning',                                                           // ya canónico
+  'in-progress': 'in-progress',                                                     // canónico
+  'in_progress': 'in-progress',                                                     // alias underscore
+  'paused': 'paused',                                                               // canónico
+  'done': 'done',                                                                   // canónico
+  'completed': 'done',                                                              // alias aceptado
+  'canceled': 'canceled',                                                           // canónico (US)
+  'cancelled': 'canceled',                                                          // alias (UK) → US
+};                                                                                  // Fin STATUS_ALIASES
+
+const normalizeStatus = (s) => {                                                    // Normaliza valor recibido (ES/EN → EN canónico)
+  if (s == null) return undefined;                                                  // Deja undefined si no viene
+  const key = String(s).trim().toLowerCase();                                       // Lower + trim
+  return STATUS_ALIASES[key] || key;                                                // Mapea alias o deja tal cual
 };                                                                                  // Cierra normalizeStatus
-const isValidStatus = (s) => {                                                      // Valida contra enum canónico
+
+const isValidStatus = (s) => {                                                      // Valida contra enum canónico del modelo
   const norm = normalizeStatus(s);                                                  // Normaliza primero
-  return !!norm && ALLOWED_STATUS.includes(String(norm));                           // Verifica pertenencia al enum
+  return typeof norm === 'string' && STATUS_CANONICALS.includes(norm);              // Debe existir en el enum del Schema
 };                                                                                  // Cierra isValidStatus
 
 // Deduplicación de ObjectId: Set por string y luego reconstrucción a ObjectId       // Para evitar duplicados por referencia
@@ -191,7 +209,7 @@ const crearProyecto = async (req, res) => {                                     
     if (typeof status !== 'undefined') {                                            // Si el cliente envía status
       if (!isValidStatus(status)) {                                                 // Validamos contra enum del Schema (EN)
         return res.status(400).json({                                               // 400 si inválido
-          message: 'Estado inválido. Usa: borrador, en progreso, en pausa, completado, cancelado (o planning, in_progress, paused, completed, cancelled)'
+          message: 'Estado inválido. Usa: borrador, en progreso, en pausa, completado, cancelado (o planning, in-progress, paused, done, canceled)'
         });
       }
       normalizedStatus = normalizeStatus(status);                                   // Normaliza a EN canónico
@@ -401,11 +419,11 @@ const updateProyectoById = async (req, res) => {                                
       proyecto.priority = priority;                                                 // Asigna
     }
 
-    // ----- Status (ES/EN aceptado → guardamos EN) -----
+    // ----- Status (ES/EN aceptado → guardamos EN canónico) -----
     if (typeof status !== 'undefined') {                                            // Si viene status
       if (!isValidStatus(status))                                                   // Validamos contra enum del modelo (EN)
         return res.status(400).json({                                               // 400 si inválido
-          message: 'Estado inválido. Usa: borrador, en progreso, en pausa, completado, cancelado (o planning, in_progress, paused, completed, cancelled)'
+          message: 'Estado inválido. Usa: borrador, en progreso, en pausa, completado, cancelado (o planning, in-progress, paused, done, canceled)'
         });
       proyecto.status = normalizeStatus(status);                                    // Guarda EN canónico
     }

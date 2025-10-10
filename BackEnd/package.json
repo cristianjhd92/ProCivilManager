@@ -1,14 +1,17 @@
 {
   "dependencies": {
     "bcryptjs": "^3.0.2",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.3",
     "nodemailer": "^7.0.6",
     "pdfkit": "^0.17.2",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "xlsx-populate": "^1.21.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
@@ -16,9 +19,11 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "fix:indexes": "node scripts/2025-10-02_fix_indexes.js",
+    "fix:users:email-collation": "node scripts/2025-10-02_fix_users_email_collation.js",
     "migrate:proyectos:fk": "node scripts/2025-10-02_migrar_proyectos_fk.js",
     "smoke:fk": "node scripts/2025-10-02_smoke_integridad_fk.js",
-    "fix:indexes": "node scripts/2025-10-02_fix_indexes.js",
-    "fix:users:email-collation": "node scripts/2025-10-02_fix_users_email_collation.js"
+    "views:apply": "node scripts/2025-10-03_create_mongo_views.js --apply",
+    "views:drop": "node scripts/2025-10-03_create_mongo_views.js --drop"
   }
 }

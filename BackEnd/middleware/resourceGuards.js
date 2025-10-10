@@ -1,46 +1,54 @@
-// File: BackEnd/middleware/resourceGuards.js                                   // Ruta del archivo
-// Descripción: Guardas de recursos basadas en ownership/roles.                  // Propósito del módulo
-// Permite acceso si el usuario tiene uno de los roles permitidos                // Resumen
-// o si es el propietario (owner) del proyecto indicado en :id.                  // Alcance
+// File: BackEnd/middleware/resourceGuards.js                                      // Ruta del archivo
+// Descripción: Guardas de recursos basadas en ownership/roles.                    // Propósito del módulo
+// Permite el acceso si el usuario tiene alguno de los roles permitidos            // Criterio 1: rol
+// o si es el propietario (owner) del proyecto indicado en el parámetro :id.       // Criterio 2: ownership
 
-const mongoose = require('mongoose');                                            // Importa mongoose para validar ObjectId
-const Proyectos = require('../models/Proyectos');                                // Importa el modelo Proyectos para consultar owner
+const mongoose = require('mongoose');                                              // Importa mongoose para validar ObjectId
+const Proyectos = require('../models/Proyectos');                                  // Modelo Proyectos para consultar el owner
 
-// Permite si el usuario tiene uno de los roles permitidos o si es owner del proyecto. // Descripción de la función
-// Uso: allowOwnerOrRoles('admin','lider de obra')                                // Ejemplo de uso
-const allowOwnerOrRoles = (...rolesPermitidos) => {                              // Define un factory de middleware con roles variables
-  return async (req, res, next) => {                                             // Retorna el middleware asíncrono (Express)
-    try {                                                                        // Manejo de errores con try/catch
-      const user = req.user;                                                     // Toma el usuario inyectado por authMiddleware
-      if (!user) return res.status(401).json({ message: 'No autorizado' });      // Si no hay usuario autenticado → 401
-
-      // Si el rol del usuario está explícitamente permitido, pasa directo        // Comentario de intención
-      if (rolesPermitidos.includes(user.role)) return next();                    // Bypass por rol permitido
-
-      // Si no tiene rol permitido, validamos que sea el owner del recurso        // Comentario de intención
-      const { id } = req.params;                                                 // Extrae el parámetro :id de la ruta
-      if (!id || !mongoose.Types.ObjectId.isValid(id)) {                         // Revisa que exista y sea un ObjectId válido
-        return res.status(400).json({ message: 'ID de proyecto inválido' });     // Si no es válido → 400
+// allowOwnerOrRoles('admin','lider de obra')                                       // Ejemplo de uso en rutas
+// Devuelve un middleware que autoriza por rol o por propiedad del recurso         // Firma general
+const allowOwnerOrRoles = (...rolesPermitidos) => {                                // Factory de middleware (recibe 0..n roles)
+  return async (req, res, next) => {                                               // Middleware asíncrono para Express
+    try {                                                                          // Manejo de errores
+      const user = req.user;                                                       // Usuario inyectado por authMiddleware
+      if (!user) {                                                                 // Si no existe (ruta sin auth)
+        return res.status(401).json({ message: 'No autorizado' });                 // 401 → requiere autenticación
       }
 
-      const proyecto = await Proyectos.findById(id).select('owner');             // Busca el proyecto y solo trae el campo owner
-      if (!proyecto) return res.status(404).json({ message: 'Proyecto no encontrado' }); // Si no existe → 404
+      // Si el rol del usuario está entre los permitidos, autoriza inmediatamente   // Bypass por rol
+      if (rolesPermitidos.includes(user.role)) {                                   // Comprueba el rol actual del usuario
+        return next();                                                             // Tiene rol suficiente → continúa
+      }
 
-      const usuarioId = String(user.id || user._id);                              // Normaliza el id del usuario (string)
-      const ownerId = String(proyecto.owner);                                     // Normaliza el owner del proyecto (string)
+      // Si no tiene rol permitido, verificamos propiedad del recurso               // Rama de ownership
+      const { id } = req.params;                                                   // Extrae el :id de la ruta (id del proyecto)
+      if (!id || !mongoose.Types.ObjectId.isValid(id)) {                           // Valida presencia y formato de ObjectId
+        return res.status(400).json({ message: 'ID de proyecto inválido' });       // 400 → parámetro inválido
+      }
 
-      if (usuarioId !== ownerId) {                                               // Compara si el usuario es el owner
-        return res.status(403).json({                                            // Si no lo es → 403 (forbidden)
-          message: 'No tienes permisos para modificar este proyecto'              // Mensaje de error
+      const proyecto = await Proyectos                                             // Consulta el proyecto por ID
+        .findById(id)                                                              // Busca el documento
+        .select('owner');                                                          // Solo necesitamos el campo owner
+      if (!proyecto) {                                                             // Si no existe
+        return res.status(404).json({ message: 'Proyecto no encontrado' });        // 404 → no existe el recurso
+      }
+
+      const usuarioId = String(user.id || user._id);                               // Normaliza id del usuario a string
+      const ownerId = String(proyecto.owner);                                      // Normaliza id del owner a string
+
+      if (usuarioId !== ownerId) {                                                 // Compara igualdad de owner
+        return res.status(403).json({                                              // Si no coincide → prohibido
+          message: 'No tienes permisos para modificar este proyecto'               // Mensaje consistente
         });
       }
 
-      return next();                                                             // Es el owner (o ya estaba permitido por rol) → continúa
-    } catch (err) {                                                              // Captura excepciones inesperadas
-      console.error('Error en allowOwnerOrRoles:', err);                         // Log del error para diagnóstico
-      return res.status(500).json({ message: 'Error de autorización' });         // Respuesta genérica 500
-    }                                                                            // Fin catch
-  };                                                                             // Fin del middleware retornado
-};                                                                               // Fin de allowOwnerOrRoles
+      return next();                                                               // Es el owner → autoriza
+    } catch (err) {                                                                // Captura errores inesperados
+      console.error('Error en allowOwnerOrRoles:', err);                           // Log técnico para diagnóstico
+      return res.status(500).json({ message: 'Error de autorización' });           // 500 genérico
+    }                                                                              // Fin catch
+  };                                                                               // Fin del middleware retornado
+};                                                                                 // Fin de la factory allowOwnerOrRoles
 
-module.exports = { allowOwnerOrRoles };                                          // Exporta el guard para usarlo en las rutas
+module.exports = { allowOwnerOrRoles };                                            // Exporta el guard para uso en rutas
