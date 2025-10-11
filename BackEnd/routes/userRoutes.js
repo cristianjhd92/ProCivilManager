@@ -13,7 +13,7 @@ const router = express.Router();                                                
 // Importa controladores de usuario (lógica de cada endpoint)                    // Reúne handlers en un solo require
 const {
   register,                                                                      // Handler: registrar usuario nuevo
-  login,                                                                         // Handler: iniciar sesión (devuelve JWT)
+  // login,                                                                      // ⚠️ Se deshabilita el login del userController
   forgotPassword,                                                                // Handler: solicitar email de recuperación
   resetPassword,                                                                 // Handler: restablecer contraseña con token
   getUserProfile,                                                                // Handler: obtener perfil del usuario autenticado
@@ -24,6 +24,9 @@ const {
   deleteUserById                                                                 // Handler: (admin) eliminar usuario por id
 } = require('../controllers/userController');                                    // Carga desde controllers/userController.js
 
+// ✅ Importa el login “nuevo” desde authController (emite access + refresh)     // Unifica el flujo de autenticación
+const { login: authLogin } = require('../controllers/authController');           // Alias authLogin para evitar conflicto de nombres
+
 // Importa middlewares de auth/roles                                              // Protegen rutas y restringen por rol
 const { authMiddleware, requireRole } = require('../middleware/authMiddleware'); // authMiddleware valida JWT; requireRole valida rol
 
@@ -31,7 +34,10 @@ const { authMiddleware, requireRole } = require('../middleware/authMiddleware');
 // Rutas públicas (no requieren autenticación)
 // -----------------------------------------------------------------------------
 router.post('/register', register);                                              // POST /api/user/register → crea usuario
-router.post('/login', login);                                                    // POST /api/user/login → autentica y retorna token
+
+// ✅ Mantén la ruta histórica, pero ahora usa el handler de authController       // Conserva compatibilidad con el front
+router.post('/login', authLogin);                                                // POST /api/user/login → ahora setea cookie refresh + access JWT
+
 router.post('/forgot-password', forgotPassword);                                 // POST /api/user/forgot-password → envía correo de reset
 router.post('/reset-password/:token', resetPassword);                            // POST /api/user/reset-password/:token → aplica reset
 
