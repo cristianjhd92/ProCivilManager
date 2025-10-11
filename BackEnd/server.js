@@ -1,60 +1,91 @@
 // File: BackEnd/server.js                                                      // Ruta del archivo dentro del proyecto
 // Descripción: Punto de entrada del backend. Configura Express, CORS, DB,      // Propósito general del servidor
-// seguridad (Helmet), compresión, Socket.io y monta rutas (usuarios, etc.).    // Componentes iniciales
+// seguridad (Helmet), compresión, cookies (JWT refresh), rate limit y rutas.   // Componentes iniciales
 
 require('dotenv').config();                                                     // Carga variables de entorno lo antes posible
 
-const express     = require('express');                                         // Framework HTTP
-const cors        = require('cors');                                            // Middleware CORS
-const http        = require('http');                                            // Servidor HTTP nativo
-const socketIo    = require('socket.io');                                       // WebSockets (tempo real)
-const helmet      = require('helmet');                                          // Cabeceras de seguridad (npm i helmet)
-const compression = require('compression');                                     // Compresión gzip/br (npm i compression)
-// const morgan   = require('morgan');                                          // (Opcional) Logger HTTP para dev
+const express      = require('express');                                        // Framework HTTP
+const cors         = require('cors');                                           // Middleware CORS
+const http         = require('http');                                           // Servidor HTTP nativo
+const socketIo     = require('socket.io');                                      // WebSockets (tiempo real)
+const helmet       = require('helmet');                                         // Cabeceras de seguridad
+const compression  = require('compression');                                    // Compresión gzip/br
+const cookieParser = require('cookie-parser');                                  // 🔐 Parseo de cookies (refresh token HttpOnly)
+const rateLimit    = require('express-rate-limit');                             // 🛡️  Límite de peticiones (login/refresh)
+// const morgan    = require('morgan');                                         // (Opcional) Logger HTTP para dev
 
-const path       = require('path');                                             // Utilidad para rutas de archivos
-const connectDB  = require('./config/db');                                      // Conexión a MongoDB (Mongoose)
+const path      = require('path');                                              // Utilidad para rutas de archivos
+const connectDB = require('./config/db');                                       // Conexión a MongoDB (Mongoose)
 
 const app    = express();                                                       // Instancia de aplicación Express
 const server = http.createServer(app);                                          // Servidor HTTP envolviendo la app
 
 // ------------------------------- CORS (HTTP + WS) -------------------------------
+// Nota importante: para que las cookies viajen, CORS debe tener credentials: true
+// y el "origin" NO puede ser "*". Usa una URL definida (por defecto localhost:3000).
+const ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';              // Origen permitido (ajusta en prod)
 const corsOptions = {                                                           // Opciones de CORS comunes
-  origin: process.env.CORS_ORIGIN || '*',                                       // Orígenes permitidos (restringe en prod)
+  origin: ORIGIN,                                                               // Debe ser una URL concreta cuando hay cookies
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],                     // Métodos permitidos
   allowedHeaders: ['Content-Type', 'Authorization'],                            // Headers permitidos
-  credentials: true,                                                            // Soporte de cookies/credenciales
+  credentials: true,                                                            // 🔑 Habilita envío de cookies
   optionsSuccessStatus: 204,                                                    // Código para preflight OK
 };                                                                              // Fin corsOptions
 
 // ------------------------------- Socket.io --------------------------------------
-const io = socketIo(server, { cors: corsOptions });                             // Inicializa Socket.io con CORS
+const io = socketIo(server, { cors: corsOptions });                             // Inicializa Socket.io con el mismo CORS
 app.set('io', io);                                                              // Expone io para usar en controladores (req.app.get('io'))
 
 // ------------------------------- Middlewares globales ---------------------------
 app.use(cors(corsOptions));                                                     // Habilita CORS para todas las rutas HTTP
-// app.options('*', cors(corsOptions));                                          // ❌ No compatible con Express 5 (comodín "*")
-// Si deseas responder explícitamente preflights, usa regex:
+// app.options('*', cors(corsOptions));                                          // ❌ En Express 5 el comodín "*" no es válido
 app.options(/.*/, cors(corsOptions));                                           // ✅ Preflights para cualquier ruta (regex en Express 5)
 app.use(helmet());                                                              // Aplica cabeceras seguras por defecto
 app.use(compression());                                                         // Habilita compresión de respuestas
-// if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));           // (Opcional) Logueo en desarrollo
 app.set('trust proxy', 1);                                                      // Detrás de proxy (Nginx/Heroku/K8s) confía en X-Forwarded-*
+// if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));           // (Opcional) Logueo en desarrollo
 
 app.use(express.json({ limit: '1mb' }));                                        // Parseo de JSON con límite de 1MB
+app.use(cookieParser());                                                        // 🍪 Necesario para leer cookies HttpOnly (refresh)
+
+// ------------------------------- Rate limits específicos ------------------------
+// Límite agresivo para intentos de login (mitigar fuerza bruta)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,                                                     // Ventana de 15 minutos
+  max: 10,                                                                       // Máximo 10 intentos por IP / ventana
+  standardHeaders: 'draft-7',                                                    // Devuelve info en headers modernos
+  legacyHeaders: false,                                                          // No usar X-RateLimit-*
+  message: { message: 'Demasiados intentos de login, intenta más tarde.' }      // Respuesta en JSON
+});                                                                              // Fin loginLimiter
+
+// Límite moderado para endpoints de /auth (incluye /refresh cuando lo montemos)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,                                                     // 15 minutos
+  max: 100,                                                                      // Máx 100 solicitudes / ventana
+  standardHeaders: 'draft-7',
+  legacyHeaders: false
+});                                                                              // Fin authLimiter
+
+// Montaje de límites por ruta (aplican antes de los handlers reales)
+// Nota: actualmente login está en /api/user/login (según tu userRoutes).
+app.use('/api/user/login', loginLimiter);                                       // 🛡️  Protege login
+// Cuando creemos /api/auth (refresh/logout/rotate), ya queda protegido:
+app.use('/api/auth', authLimiter);                                              // 🛡️  Protege endpoints de auth (refresh)
 
 // ------------------------------- Importación de rutas ---------------------------
 const userRoute       = require('./routes/userRoutes');                         // Endpoints de usuario (auth, perfil, admin)
+const authRoutes      = require('./routes/authRoutes');                          // (Próximo paso) Endpoints JWT: /refresh, /logout (cookies)
 const contactRoutes   = require('./routes/contactRoutes');                      // Endpoints de contacto (formulario/mensajes)
 const proyectosRoutes = require('./routes/ProyectoRoutes');                     // Endpoints de proyectos (CRUD protegido)
 const statsRoutes     = require('./routes/statsRoutes');                        // Endpoints analíticos (si no duplican reportes)
 const reportRoutes    = require('./routes/reportRoutes');                       // Endpoints de reportes (PDF/XLSX/JSON)
 
 // ------------------------------- Montaje de rutas -------------------------------
-app.use('/api/user',       userRoute);                                          // Prefijo /api/user → usuarios
-app.use('/api',            contactRoutes);                                      // Prefijo /api → contactos (ajustar si necesitas /api/contact)
+app.use('/api/user',       userRoute);                                          // Prefijo /api/user → usuarios (login/register/me/etc.)
+app.use('/api/auth',     authRoutes);                                           // (Próximo paso) /api/auth → refresh/logout/rotate
+app.use('/api',            contactRoutes);                                      // Prefijo /api → contactos
 app.use('/api/proyectos',  proyectosRoutes);                                    // Prefijo /api/proyectos → proyectos
-app.use('/api/stats',      statsRoutes);                                        // Prefijo /api/stats → analíticas (no dupliques PDF/XLSX aquí)
+app.use('/api/stats',      statsRoutes);                                        // Prefijo /api/stats → analíticas
 app.use('/api/reportes',   reportRoutes);                                       // Prefijo /api/reportes → reportes
 
 // ------------------------------- Documentación estática (opcional) -------------
