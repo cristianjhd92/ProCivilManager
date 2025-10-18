@@ -10,6 +10,9 @@
 const express = require('express');                                              // Importa express para crear routers HTTP
 const router = express.Router();                                                 // Instancia un router modular de Express
 
+// ✅ Limiters de rate limit (IP + usuario) para /login
+const { loginIpLimiter, loginUserLimiter } = require('../middleware/rateLimit'); // Centralizados en /middleware
+
 // Importa controladores de usuario (lógica de cada endpoint)                    // Reúne handlers en un solo require
 const {
   register,                                                                      // Handler: registrar usuario nuevo
@@ -35,8 +38,8 @@ const { authMiddleware, requireRole } = require('../middleware/authMiddleware');
 // -----------------------------------------------------------------------------
 router.post('/register', register);                                              // POST /api/user/register → crea usuario
 
-// ✅ Mantén la ruta histórica, pero ahora usa el handler de authController       // Conserva compatibilidad con el front
-router.post('/login', authLogin);                                                // POST /api/user/login → ahora setea cookie refresh + access JWT
+// ✅ Protegemos /login con doble limitador: por IP y por usuario (3 intentos/ventana según .env)
+router.post('/login', loginIpLimiter, loginUserLimiter, authLogin);              // POST /api/user/login → ahora con rate limit
 
 router.post('/forgot-password', forgotPassword);                                 // POST /api/user/forgot-password → envía correo de reset
 router.post('/reset-password/:token', resetPassword);                            // POST /api/user/reset-password/:token → aplica reset

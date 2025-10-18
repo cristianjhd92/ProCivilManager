@@ -2,90 +2,98 @@
 // Descripción: Middleware de autenticación JWT y autorización por roles.         // Propósito general
 // - Extrae y verifica el token Bearer desde el header Authorization.             // Origen del token
 // - Verifica el JWT con utils/jwt.verifyAccessToken (payload: { sub, role }).    // Fuente de verdad (helpers centralizados)
-// - Carga el usuario desde BD para asegurar que aún exista.                      // Integridad
+// - Carga el usuario desde BD para asegurar que aún exista.                      // Integridad de sesión
 // - Inyecta req.user = { id, email, role, name? }.                               // Contexto para handlers
 // - Exporta helper requireRole(...roles) para proteger rutas por rol.            // Autorización por rol
+// Notas:
+// - El modelo User usa firstName/lastName, no "name": aquí construimos name opcionalmente. // Alineación con tu esquema
 
-const User = require('../models/User');                                           // Modelo User para validar existencia
-const { verifyAccessToken } = require('../utils/jwt');                            // Helper para verificar Access JWT (HS256, exp, iss, aud)
-
-// -----------------------------------------------------------------------------
-// Extrae token del encabezado Authorization: Bearer <token>
-// -----------------------------------------------------------------------------
-function extractBearerToken(req) {                                                // Declara función auxiliar de extracción
-  const authHeader = req.headers?.authorization || '';                            // Lee cabecera Authorization (o cadena vacía)
-  if (!authHeader.toLowerCase().startsWith('bearer ')) return null;               // Si no empieza por "bearer ", retorna null
-  return authHeader.split(' ')[1] || null;                                        // Devuelve la segunda parte como token (o null)
-}                                                                                 // Cierra extractBearerToken
+const User = require('../models/User');                                           // Importa el modelo User (para verificar existencia)
+const { verifyAccessToken } = require('../utils/jwt');                            // Importa helper para validar Access JWT
 
 // -----------------------------------------------------------------------------
-// Middleware principal de autenticación
+// Extrae token del encabezado Authorization: Bearer <token> (case-insensitive)   // Utilidad de parsing
+// -----------------------------------------------------------------------------
+function extractBearerToken(req) {                                                // Declara función extractora
+  const authHeader = req.headers?.authorization || '';                            // Lee header Authorization (o '')
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);                             // Busca patrón "Bearer <token>"
+  return match ? match[1] : null;                                                 // Devuelve el token o null si no coincide
+}                                                                                 // Fin extractBearerToken
+
+// -----------------------------------------------------------------------------
+// Middleware principal de autenticación                                           // Verifica JWT y carga usuario
 // -----------------------------------------------------------------------------
 const authMiddleware = async (req, res, next) => {                                // Declara middleware async
-  try {                                                                           // Abre try para manejo de errores
-    if (!process.env.JWT_SECRET) {                                                // Si falta la clave secreta en el entorno
-      return res.status(500).json({                                               // Responde 500 (configuración inválida)
-        message: 'Config del servidor incompleta (JWT_SECRET faltante)'           // Mensaje de error
-      });                                                                          // Cierra json
-    }                                                                              // Cierra if JWT_SECRET
+  try {                                                                           // Manejo de errores
+    if (!process.env.JWT_SECRET) {                                                // Valida config mínima (secreto JWT)
+      return res.status(500).json({                                               // Responde 500 si falta secreto
+        message: 'Config del servidor incompleta (JWT_SECRET faltante)'           // Mensaje explícito
+      });                                                                          // Fin respuesta
+    }                                                                              // Fin if
 
-    const token = extractBearerToken(req);                                        // Intenta extraer token Bearer del header
-    if (!token) {                                                                 // Si no hay token
-      return res.status(401).json({ message: 'No token provided' });              // 401 No autorizado por ausencia de token
-    }                                                                              // Cierra if !token
+    const token = extractBearerToken(req);                                        // Intenta extraer Bearer token del header
+    if (!token) {                                                                 // Si no hay token → no autenticado
+      return res.status(401).json({ message: 'Token no provisto' });              // 401 Unauthorized
+    }                                                                              // Fin if
 
-    let payload;                                                                   // Variable para el payload decodificado
-    try {                                                                          // Intenta verificar el token
-      payload = verifyAccessToken(token);                                          // Verifica firma/exp/issuer/audience via utils/jwt
-    } catch (err) {                                                                // Si falla verificación/expiración
-      return res.status(401).json({ message: 'Token inválido o expirado' });      // 401 Token no válido/expirado
-    }                                                                              // Cierra catch verify
+    let payload;                                                                   // Variable para payload verificado
+    try {                                                                          // Intenta verificar
+      payload = verifyAccessToken(token);                                          // Verifica firma, exp, iss/aud (si aplica)
+    } catch (_err) {                                                               // Si falla verificación/expiración
+      return res.status(401).json({ message: 'Token inválido o expirado' });      // 401 con mensaje estándar
+    }                                                                              // Fin catch verificación
 
-    const userId = String(payload.sub || '');                                      // Obtiene id (subject) del token (usamos "sub" por estándar)
-    if (!userId) {                                                                 // Si el payload carece de subject
-      return res.status(401).json({ message: 'Token inválido (sin id de usuario)' });// 401 Payload mal formado
-    }                                                                              // Cierra if !userId
+    const userId = String(payload.sub || '');                                      // Obtiene subject (id de usuario) del payload
+    if (!userId) {                                                                 // Si el token no trae sub válido
+      return res.status(401).json({ message: 'Token inválido (sin id de usuario)' });// 401 por payload mal formado
+    }                                                                              // Fin if
 
-    const user = await User.findById(userId).select('email role name');            // Busca usuario y proyecta email/role/name
-    if (!user) {                                                                   // Si no existe (borrado o inactivo)
-      return res.status(401).json({ message: 'Usuario no encontrado o inactivo' });// 401 Usuario inválido
-    }                                                                              // Cierra if !user
+    const user = await User.findById(userId)                                       // Busca usuario por id en BD
+      .select('email role firstName lastName');                                     // Proyecta campos mínimos necesarios
+    if (!user) {                                                                   // Si no existe (borrado/inactivo)
+      return res.status(401).json({ message: 'Usuario no encontrado o inactivo' });// 401 sesión inválida
+    }                                                                              // Fin if
 
-    req.user = {                                                                   // Inyecta identidad normalizada en la request
-      id: String(user._id),                                                        // id como string
+    const name = [user.firstName, user.lastName]                                   // Construye nombre completo opcional
+      .filter(Boolean)                                                             // Filtra valores falsy
+      .join(' ')                                                                   // Une con espacio
+      .trim() || undefined;                                                        // Si queda vacío → undefined
+
+    req.user = {                                                                   // Inyecta identidad en la request
+      id: String(user._id),                                                        // id del usuario como string
       email: user.email,                                                           // email normalizado
       role: user.role,                                                             // rol actual
-      name: user.name || undefined                                                 // (opcional) nombre si existe en el esquema
-    };                                                                             // Cierra objeto req.user
+      name                                                                          // nombre completo (opcional)
+    };                                                                             // Fin req.user
 
-    return next();                                                                 // Continúa con el siguiente middleware/handler
+    return next();                                                                 // Continúa al siguiente middleware/handler
   } catch (error) {                                                                // Captura errores inesperados
-    console.error('authMiddleware error:', error);                                 // Log técnico del error
+    console.error('authMiddleware error:', error);                                 // Log técnico
     return res.status(500).json({ message: 'Error de autenticación' });            // 500 genérico
-  }                                                                                // Cierra catch
-};                                                                                 // Cierra authMiddleware
+  }                                                                                // Fin catch
+};                                                                                 // Fin authMiddleware
 
 // -----------------------------------------------------------------------------
-// Helper de autorización por rol: usar después de authMiddleware
-// Ejemplo: router.get('/admin', authMiddleware, requireRole('admin'), handler)
+// Helper de autorización por rol: usar después de authMiddleware                 // requireRole(...)
+// Ejemplo: router.get('/admin', authMiddleware, requireRole('admin'), handler)  // Uso típico
 // -----------------------------------------------------------------------------
-const requireRole = (...allowedRoles) => {                                         // Declara fábrica de middleware por roles
-  return (req, res, next) => {                                                     // Middleware resultante
+const requireRole = (...allowedRoles) => {                                         // Fábrica de middleware de roles
+  return (req, res, next) => {                                                     // Devuelve middleware concreto
     if (!req.user?.role) {                                                         // Si no hay usuario/rol en req
-      return res.status(403).json({ message: 'Acceso denegado' });                 // 403 Prohibido (no autenticado o sin rol)
-    }                                                                              // Cierra if sin rol
+      return res.status(403).json({ message: 'Acceso denegado' });                 // 403 Forbidden
+    }                                                                              // Fin if
     if (!allowedRoles.includes(req.user.role)) {                                   // Si su rol no está permitido
-      return res.status(403).json({ message: 'No tienes permisos para esta operación' }); // 403 Prohibido (rol insuficiente)
-    }                                                                              // Cierra if rol no permitido
-    return next();                                                                  // Autorizado → continúa
-  };                                                                               // Cierra función middleware
-};                                                                                 // Cierra requireRole
+      return res.status(403).json({ message: 'No tienes permisos para esta operación' }); // 403
+    }                                                                              // Fin if
+    return next();                                                                  // Autorizado → pasa
+  };                                                                               // Fin middleware por rol
+};                                                                                 // Fin requireRole
 
 // -----------------------------------------------------------------------------
-// Exportaciones
+// Exportaciones                                                                  // API del módulo
 // -----------------------------------------------------------------------------
-module.exports = {                                                                 // Exporta API del módulo
-  authMiddleware,                                                                  // Middleware principal (nombre original)
-  requireAuth: authMiddleware,                                                     // Alias para consistencia en rutas (requireAuth)
+module.exports = {                                                                 // Exporta símbolos
+  authMiddleware,                                                                  // Middleware principal (alias requireAuth)
+  requireAuth: authMiddleware,                                                     // Alias por consistencia en rutas
   requireRole                                                                      // Helper de autorización por rol
 };                                                                                 // Fin export

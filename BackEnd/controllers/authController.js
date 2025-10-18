@@ -1,258 +1,281 @@
-// File: BackEnd/controllers/authController.js                           // Ruta del archivo (nuevo)
+// File: BackEnd/controllers/authController.js                           // Ruta del archivo
 // Descripción: Controlador de autenticación con Access JWT + Refresh.   // Propósito
 // - /auth/login: emite access JWT y setea refresh en cookie HttpOnly.    // Login
 // - /auth/refresh: rota refresh y emite nuevo access JWT.                // Rotación
 // - /auth/logout: revoca el refresh actual y limpia cookie.              // Logout actual
 // - /auth/logout-all: revoca todos los refresh del usuario.              // Logout global
 
-const bcrypt = require('bcryptjs');                                      // Importa bcrypt para comparar contraseñas
-const User = require('../models/User');                                  // Importa el modelo User
-const RefreshToken = require('../models/RefreshToken');                  // Importa el modelo RefreshToken
+const bcrypt = require('bcryptjs');                                      // Comparación de contraseñas
+const User = require('../models/User');                                  // Modelo User (con lockout)
+const RefreshToken = require('../models/RefreshToken');                  // Modelo RefreshToken
 
-const {                                                                // Importa utilidades relacionadas con JWT/Refresh
-  signAccessToken,                                                     // Función para firmar el Access JWT
-  generateRefreshTokenValue,                                           // Genera un valor aleatorio de refresh (texto claro)
-  hashRefreshToken,                                                    // Hashea el valor del refresh para persistir en BD
-  getRefreshExpiryDate,                                                // Calcula la fecha de expiración del refresh
-  getRefreshCookieName,                                                // Obtiene el nombre de la cookie desde .env
-  getRefreshCookieOptions                                              // Obtiene opciones seguras de cookie desde .env
-} = require('../utils/jwt');                                           // Ruta del utilitario
-
-// -----------------------------------------------------------------------------
-// Helpers internos                                                             // Sección de utilidades internas
-// -----------------------------------------------------------------------------
-
-function sanitizeUser(u) {                                                     // Normaliza los datos del usuario para el front
-  return {                                                                     // Devuelve un objeto seguro
-    id: String(u._id),                                                         // id del usuario como string
-    email: u.email,                                                            // email del usuario
-    role: u.role || 'user',                                                    // rol del usuario (user por defecto)
-    name: u.name || undefined                                                  // nombre si existe en el esquema
-  };                                                                           // Fin del objeto devuelto
-}                                                                              // Fin de sanitizeUser
-
-function getClientMeta(req) {                                                  // Obtiene metadatos del cliente (IP y User-Agent)
-  const ip =                                                                    // Determina IP del cliente
-    req.headers['x-forwarded-for']?.split(',').shift()?.trim() ||              // Toma la primera IP de X-Forwarded-For si existe
-    req.socket?.remoteAddress ||                                               // O la IP remota del socket
-    req.ip ||                                                                  // O la IP según Express
-    '0.0.0.0';                                                                 // Fallback por si no hay nada
-  const ua = req.headers['user-agent'] || 'unknown';                           // Obtiene el User-Agent o 'unknown'
-  return { ip, userAgent: ua };                                                // Devuelve objeto con ip y userAgent
-}                                                                              // Fin de getClientMeta
-
-function setRefreshCookie(res, refreshValue) {                                 // Setea la cookie HttpOnly del refresh token
-  const cookieName = getRefreshCookieName();                                   // Obtiene el nombre de la cookie
-  const cookieOpts = getRefreshCookieOptions();                                // Obtiene las opciones (secure, httpOnly, etc.)
-  res.cookie(cookieName, refreshValue, cookieOpts);                            // Envía la cookie al cliente
-}                                                                              // Fin de setRefreshCookie
-
-function clearRefreshCookie(res) {                                             // Limpia/borra la cookie de refresh
-  const cookieName = getRefreshCookieName();                                   // Obtiene el nombre de la cookie
-  const { domain, path } = getRefreshCookieOptions();                          // Extrae domain y path para limpieza precisa
-  res.clearCookie(cookieName, { domain, path });                               // Borra la cookie en el cliente
-}                                                                              // Fin de clearRefreshCookie
+const {                                                                // Utilidades JWT/Refresh centralizadas
+  signAccessToken,                                                     // Firma Access JWT
+  generateRefreshTokenValue,                                           // Genera valor aleatorio (texto claro)
+  hashRefreshToken,                                                    // Hash SHA-256 del refresh
+  getRefreshExpiryDate,                                                // Fecha de expiración del refresh
+  getRefreshCookieName,                                                // Nombre de la cookie (p.ej. pm_rt)
+  getRefreshCookieOptions                                              // Opciones seguras para la cookie
+} = require('../utils/jwt');                                           // Utilidades compartidas
 
 // -----------------------------------------------------------------------------
-// POST /auth/login                                                              // Endpoint de inicio de sesión
+// Helpers internos
+// -----------------------------------------------------------------------------
+
+function fullName(u) {                                                           // Calcula nombre completo
+  const fn = String(u.firstName || '').trim();                                   // Nombre
+  const ln = String(u.lastName  || '').trim();                                   // Apellido
+  const n = (fn + ' ' + ln).trim();                                              // Concatena/limpia
+  return n || undefined;                                                         // undefined si vacío
+}
+
+function sanitizeUser(u) {                                                       // Proyección segura al front
+  return {
+    id: String(u._id),                                                           // _id → string
+    email: u.email,                                                              // Email
+    role: u.role || 'cliente',                                                   // Rol (fallback)
+    name: fullName(u)                                                            // Nombre calculado
+  };
+}
+
+function getClientMeta(req) {                                                    // Extrae IP y User-Agent
+  const ip =
+    req.headers['x-forwarded-for']?.split(',').shift()?.trim() ||                // 1ª IP si hay proxy
+    req.socket?.remoteAddress ||                                                 // IP de socket
+    req.ip ||                                                                    // IP segun Express
+    '0.0.0.0';                                                                   // Fallback
+  const ua = req.headers['user-agent'] || 'unknown';                             // User-Agent o 'unknown'
+  return { ip, userAgent: ua };                                                  // Objeto meta
+}
+
+function setRefreshCookie(res, refreshValue) {                                   // Setea cookie HttpOnly
+  const cookieName = getRefreshCookieName();                                     // Nombre cookie
+  const cookieOpts = getRefreshCookieOptions();                                  // Opciones (secure, sameSite, etc.)
+  res.cookie(cookieName, refreshValue, cookieOpts);                              // Envía Set-Cookie
+}
+
+function clearRefreshCookie(res) {                                               // Borra cookie de refresh
+  const cookieName = getRefreshCookieName();                                     // Nombre cookie
+  const opts = getRefreshCookieOptions();                                        // Mismas opciones que set
+  // ⚠️ Importante: usar mismas flags (domain, path, sameSite, secure, httpOnly)
+  res.clearCookie(cookieName, {                                                  // Envía Set-Cookie para borrar
+    domain: opts.domain,                                                         // Mismo dominio
+    path: opts.path,                                                             // Mismo path
+    sameSite: opts.sameSite,                                                     // Misma política
+    secure: opts.secure,                                                         // Misma seguridad
+    httpOnly: opts.httpOnly,                                                     // Misma HttpOnly
+  });
+}
+
+// -----------------------------------------------------------------------------
+// POST /auth/login
 // -----------------------------------------------------------------------------
 /**
- * Body esperado: { email: string, password: string }                           // Contrato de entrada
- * Respuesta (200):                                                              // Contrato de salida
- *   {
- *     token_type: "Bearer",
- *     access_token: "<jwt>",
- *     expires_in: "<config JWT_ACCESS_EXPIRES>",
- *     user: { id, email, role, name? }
- *   }
- * Set-Cookie: pm_rt=<refresh>; HttpOnly; ... (según .env)                      // Cookie con refresh token
+ * Body: { email, password }
+ * 200: { token_type:'Bearer', access_token, expires_in, user:{id,email,role,name?} }
+ * Set-Cookie: <pm_rt>=<refresh>; HttpOnly; Secure?; SameSite=...; Path=/; Domain=...
  */
-exports.login = async (req, res, next) => {                                     // Exporta handler login (async)
-  try {                                                                         // Manejo de errores con try/catch
-    const { email, password } = req.body || {};                                 // Extrae email y password del body
-    if (!email || !password) {                                                  // Valida que ambos existan
-      const err = new Error('Email y password son requeridos');                 // Crea error semántico
-      err.status = 400;                                                         // Asigna status 400 (Bad Request)
-      throw err;                                                                // Lanza el error
+exports.login = async (req, res, next) => {                                     // Handler login
+  try {                                                                         // Try/catch principal
+    const { email, password } = req.body || {};                                 // Lee body
+    if (!email || !password) {                                                  // Validación básica
+      const err = new Error('Email y password son requeridos');                 // Error semántico
+      err.status = 400;                                                         // 400 Bad Request
+      throw err;                                                                // Corta flujo
     }
 
-    const user = await User.findOne({ email })                                  // Busca usuario por email
-      .collation({ locale: 'es', strength: 2 })                                 // Aplica collation ES (insensible a mayúsculas/acentos)
-      .exec();                                                                  // Ejecuta la consulta
+    const user = await User.findOne({ email })                                  // Busca por email
+      .collation({ locale: 'es', strength: 2 })                                 // Insensible a mayúsculas/acentos
+      .exec();                                                                  // Ejecuta consulta
 
-    if (!user) {                                                                // Si no encuentra usuario
-      const err = new Error('Credenciales inválidas');                          // Mensaje genérico (no revelar detalle)
-      err.status = 401;                                                         // 401 Unauthorized
-      throw err;                                                                // Lanza el error
-    }
-
-    const ok = await bcrypt.compare(String(password), String(user.password));   // Compara la contraseña con el hash
-    if (!ok) {                                                                  // Si la comparación falla
+    if (!user) {                                                                // No encontrado
       const err = new Error('Credenciales inválidas');                          // Mensaje genérico
       err.status = 401;                                                         // 401 Unauthorized
-      throw err;                                                                // Lanza el error
+      throw err;                                                                // No revelar existencia
     }
 
-    const accessToken = signAccessToken({ id: user._id, role: user.role });     // Firma el Access JWT con id y rol
+    try {                                                                       // Verifica lockout activo
+      user.assertNotLocked();                                                   // Lanza si bloqueado
+    } catch (e) {                                                               // Captura bloqueo
+      if (e?.code === 'ACCOUNT_LOCKED') {                                       // Código semántico
+        return res.status(423).json({ ok: false, message: e.message });         // 423 Locked
+      }
+      throw e;                                                                  // Propaga otros errores
+    }
 
-    const rtValue = generateRefreshTokenValue();                                 // Genera valor en claro del refresh token
-    const rtHash  = hashRefreshToken(rtValue);                                   // Lo hashea para persistir en BD
-    const expiresAt = getRefreshExpiryDate();                                    // Calcula fecha de expiración
-    const meta = getClientMeta(req);                                             // Obtiene IP y User-Agent
+    const ok = await bcrypt.compare(String(password), String(user.password));   // Compara hash
+    if (!ok) {                                                                  // Password incorrecta
+      await user.registerFailedLogin();                                         // Incrementa intentos / bloquea
+      if (user.isLocked) {                                                      // Si disparó bloqueo ahora
+        return res.status(423).json({ ok: false, message: 'Cuenta bloqueada temporalmente. Intenta más tarde.' });
+      }
+      const err = new Error('Credenciales inválidas');                          // 401 genérico
+      err.status = 401;
+      throw err;
+    }
 
-    await RefreshToken.create({                                                  // Inserta registro de refresh en BD
-      user: user._id,                                                            // Referencia al usuario
-      tokenHash: rtHash,                                                         // Guarda el hash del token
-      expiresAt,                                                                 // Fecha de expiración
-      createdAt: new Date(),                                                     // Marca de creación
-      createdByIp: meta.ip,                                                      // IP que lo creó
-      userAgent: meta.userAgent                                                  // User-Agent del cliente
-      // revokedAt: null, replacedBy: null                                       // Campos nulos por defecto
-    });                                                                          // Fin de create
+    await user.resetLoginCounters();                                            // Limpia métricas tras éxito
 
-    setRefreshCookie(res, rtValue);                                              // Envía cookie HttpOnly con el valor en claro
+    const accessToken = signAccessToken({ id: user._id, role: user.role });     // Firma Access JWT
 
-    return res.status(200).json({                                                // Responde 200 OK con payload
-      token_type: 'Bearer',                                                      // Indica tipo de token
-      access_token: accessToken,                                                 // Entrega el Access JWT
-      expires_in: process.env.JWT_ACCESS_EXPIRES || '15m',                       // Expira según .env (fallback 15m)
-      user: sanitizeUser(user)                                                   // Devuelve datos mínimos del usuario
-    });                                                                          // Fin de respuesta 200
-  } catch (err) {                                                                // Captura de errores
-    return next(err);                                                            // Delega al manejador global de errores
-  }                                                                              // Fin del catch
-};                                                                               // Fin de exports.login
+    const rtValue   = generateRefreshTokenValue();                              // Genera refresh claro
+    const rtHash    = hashRefreshToken(rtValue);                                // Hash para BD
+    const expiresAt = getRefreshExpiryDate();                                   // Expiración
+    const meta      = getClientMeta(req);                                       // IP y UA
+
+    await RefreshToken.create({                                                 // Inserta RT en BD
+      user: user._id,                                                           // Dueño
+      tokenHash: rtHash,                                                        // Hash
+      expiresAt,                                                                // Vencimiento
+      createdAt: new Date(),                                                    // Marca de creación
+      createdByIp: meta.ip,                                                     // IP creadora
+      userAgent: meta.userAgent                                                 // UA creador
+    });
+
+    setRefreshCookie(res, rtValue);                                             // Set-Cookie (HttpOnly)
+
+    return res.status(200).json({                                               // Respuesta de éxito
+      token_type: 'Bearer',                                                     // Bearer
+      access_token: accessToken,                                                // JWT
+      expires_in: process.env.JWT_ACCESS_EXPIRES || '15m',                      // Vida aprox
+      user: sanitizeUser(user),                                                 // Proyección segura
+    });
+  } catch (err) {                                                               // Manejo de error
+    if (err?.code === 'ACCOUNT_LOCKED') {                                       // Bloqueo activo
+      return res.status(423).json({ ok: false, message: err.message });         // 423 Locked
+    }
+    if (err?.status) {                                                          // Errores 4xx previstos
+      return res.status(err.status).json({ ok: false, message: err.message });  // Responder sin stack
+    }
+    return next(err);                                                           // 5xx → handler global
+  }
+};
 
 // -----------------------------------------------------------------------------
-// POST /auth/refresh                                                            // Endpoint de rotación de refresh
+// POST /auth/refresh
 // -----------------------------------------------------------------------------
 /**
- * Requiere cookie HttpOnly con el refresh actual.                               // Condición de entrada
- * Flujo:                                                                        // Descripción del flujo
- *  - Leer cookie, validar existencia.
- *  - Buscar token por hash y vigencia; si no existe → 401 + clear cookie.
- *  - Rotar: crear nuevo RT, marcar actual como revoked y replacedBy (o eliminar).
- *  - Emitir nuevo access JWT y setear nueva cookie.
+ * Requiere cookie HttpOnly con el refresh actual.
+ * Flujo:
+ *  - Leer cookie → si falta: 401 + clear cookie (sin throw).
+ *  - Buscar en BD por hash, no revocado y sin expirar → si falla: 401 + clear cookie (sin throw).
+ *  - Rotar: crear nuevo RT, marcar el actual como revoked + replacedBy.
+ *  - Emitir nuevo access y setear nueva cookie.
  */
-exports.refresh = async (req, res, next) => {                                   // Exporta handler refresh (async)
-  try {                                                                         // Manejo de errores con try/catch
-    const cookieName = getRefreshCookieName();                                   // Obtiene nombre de la cookie
-    const rtClear = req.cookies?.[cookieName];                                   // Lee el valor en claro desde la cookie
-    if (!rtClear) {                                                              // Si no vino la cookie
-      const err = new Error('Refresh token ausente');                            // Crea error semántico
-      err.status = 401;                                                          // 401 Unauthorized
-      throw err;                                                                 // Lanza el error
+exports.refresh = async (req, res, next) => {                                   // Handler refresh
+  try {                                                                         // Try/catch principal
+    const cookieName = getRefreshCookieName();                                   // Nombre cookie
+    const rtClear = req.cookies?.[cookieName];                                   // Valor claro desde cookie
+    if (!rtClear) {                                                              // Si no hay cookie
+      clearRefreshCookie(res);                                                   // Limpia por si acaso
+      return res.status(401).json({ ok: false, message: 'Refresh token ausente' }); // 401 directo
     }
 
-    const rtHash = hashRefreshToken(rtClear);                                    // Hashea el valor claro para buscar en BD
-    const now = new Date();                                                      // Obtiene el tiempo actual
+    const rtHash = hashRefreshToken(rtClear);                                    // Hash para lookup
+    const now = new Date();                                                      // Timestamp
 
-    const current = await RefreshToken.findOne({                                 // Busca un refresh válido
-      tokenHash: rtHash,                                                         // Coincidencia por hash
-      revokedAt: null,                                                           // Que no esté revocado
-      expiresAt: { $gt: now }                                                    // Y no esté expirado
-    }).populate('user', 'email role name');                                      // Trae datos mínimos del usuario
+    const current = await RefreshToken.findOne({                                 // Busca RT válido
+      tokenHash: rtHash,                                                         // Coincide hash
+      revokedAt: null,                                                           // No revocado
+      expiresAt: { $gt: now }                                                    // No expirado
+    }).populate('user', 'email role firstName lastName');                        // Carga usuario
 
-    if (!current || !current.user) {                                             // Si no existe o está huérfano
-      clearRefreshCookie(res);                                                   // Limpia cookie inválida/expirada
-      const err = new Error('Refresh token inválido o expirado');                // Mensaje genérico
-      err.status = 401;                                                          // 401 Unauthorized
-      throw err;                                                                 // Lanza el error
+    if (!current || !current.user) {                                             // RT inválido/huérfano
+      clearRefreshCookie(res);                                                   // Limpia cookie
+      return res.status(401).json({ ok: false, message: 'Refresh token inválido o expirado' }); // 401 directo
     }
 
-    const meta = getClientMeta(req);                                             // Lee IP y User-Agent del cliente
-    const newValue = generateRefreshTokenValue();                                 // Genera nuevo valor en claro
-    const newHash  = hashRefreshToken(newValue);                                  // Hashea nuevo valor
-    const newExpires = getRefreshExpiryDate();                                    // Nueva fecha de expiración
+    const meta = getClientMeta(req);                                             // IP/UA cliente
+    const newValue   = generateRefreshTokenValue();                               // Nuevo valor claro
+    const newHash    = hashRefreshToken(newValue);                                // Hash nuevo
+    const newExpires = getRefreshExpiryDate();                                    // Nueva expiración
 
-    const replacement = await RefreshToken.create({                               // Inserta el nuevo refresh en BD
+    const replacement = await RefreshToken.create({                               // Crea RT reemplazo
       user: current.user._id,                                                    // Mismo usuario
-      tokenHash: newHash,                                                        // Hash del nuevo refresh
-      expiresAt: newExpires,                                                     // Fecha de expiración nueva
-      createdAt: now,                                                            // Marca de creación
-      createdByIp: meta.ip,                                                      // IP creadora
-      userAgent: meta.userAgent                                                  // User-Agent creador
-    });                                                                          // Fin de create
+      tokenHash: newHash,                                                        // Hash
+      expiresAt: newExpires,                                                     // Vencimiento
+      createdAt: now,                                                            // Creado ahora
+      lastUsedAt: now,                                                           // (opcional) primera “uso”
+      createdByIp: meta.ip,                                                      // IP
+      userAgent: meta.userAgent                                                  // UA
+    });
 
-    current.revokedAt = now;                                                     // Marca el actual como revocado
-    current.replacedBy = replacement._id;                                        // Enlaza con el nuevo refresh
-    current.revokedByIp = meta.ip;                                               // Guarda IP que revoca
-    await current.save();                                                        // Persiste cambios del actual
+    current.revokedAt  = now;                                                    // Marca actual revocado
+    current.replacedBy = replacement._id;                                        // Enlaza reemplazo
+    current.revokedByIp= meta.ip;                                                // IP que revoca
+    await current.save();                                                        // Persiste cambios
 
-    const accessToken = signAccessToken({                                        // Firma nuevo Access JWT
-      id: current.user._id,                                                      // Id del usuario
-      role: current.user.role                                                    // Rol del usuario
-    });                                                                          // Fin de signAccessToken
+    const accessToken = signAccessToken({                                        // Firma nuevo access
+      id: current.user._id,                                                      // _id usuario
+      role: current.user.role                                                    // Rol
+    });
 
-    setRefreshCookie(res, newValue);                                             // Envía cookie con el nuevo refresh
+    setRefreshCookie(res, newValue);                                             // Set-Cookie con RT nuevo
 
-    return res.status(200).json({                                                // Responde 200 OK
-      token_type: 'Bearer',                                                      // Tipo Bearer
-      access_token: accessToken,                                                 // Access token nuevo
-      expires_in: process.env.JWT_ACCESS_EXPIRES || '15m',                       // Expiración declarada
-      user: sanitizeUser(current.user)                                           // Usuario saneado
-    });                                                                          // Fin de respuesta
-  } catch (err) {                                                                // Captura de errores
-    return next(err);                                                            // Delega al manejador global
-  }                                                                              // Fin del catch
-};                                                                               // Fin de exports.refresh
+    return res.status(200).json({                                                // Respuesta 200
+      token_type: 'Bearer',                                                      // Bearer
+      access_token: accessToken,                                                 // JWT nuevo
+      expires_in: process.env.JWT_ACCESS_EXPIRES || '15m',                       // Vida aprox
+      user: sanitizeUser(current.user),                                          // Usuario saneado
+    });
+  } catch (err) {                                                                // Errores inesperados
+    return next(err);                                                            // 5xx → handler global
+  }
+};
 
 // -----------------------------------------------------------------------------
-// POST /auth/logout                                                             // Endpoint para cerrar sesión actual
+// POST /auth/logout
 // -----------------------------------------------------------------------------
 /**
- * Requiere cookie HttpOnly con el refresh actual.                               // Condición
+ * Requiere cookie HttpOnly con el refresh actual.
  * Efecto:
- *  - Revoca (o elimina) el refresh de BD si existe.                             // Acción en BD
- *  - Limpia cookie.                                                             // Acción en cliente
+ *  - Revoca (si existe en BD) el refresh del cliente.
+ *  - Limpia cookie.
  */
-exports.logout = async (req, res, next) => {                                     // Exporta handler logout (async)
-  try {                                                                          // Manejo de errores con try/catch
-    const cookieName = getRefreshCookieName();                                   // Obtiene nombre de la cookie
-    const rtClear = req.cookies?.[cookieName];                                   // Lee cookie del request
-    if (rtClear) {                                                               // Si existe cookie
-      const rtHash = hashRefreshToken(rtClear);                                  // Hashea valor para buscar
-      const doc = await RefreshToken.findOne({                                   // Busca refresh activo
-        tokenHash: rtHash,                                                       // Por hash
-        revokedAt: null                                                          // Y no revocado
-      });                                                                        // Fin de consulta
-      if (doc) {                                                                 // Si encontró documento
-        doc.revokedAt = new Date();                                              // Marca como revocado ahora
-        doc.revokedByIp = getClientMeta(req).ip;                                 // Anota IP que revoca
-        await doc.save();                                                        // Guarda cambios
+exports.logout = async (req, res, next) => {                                     // Handler logout
+  try {                                                                          // Try/catch
+    const cookieName = getRefreshCookieName();                                   // Nombre cookie
+    const rtClear = req.cookies?.[cookieName];                                   // Lee cookie
+    if (rtClear) {                                                               // Si hay valor
+      const rtHash = hashRefreshToken(rtClear);                                  // Hash para lookup
+      const doc = await RefreshToken.findOne({ tokenHash: rtHash, revokedAt: null }); // Busca activo
+      if (doc) {                                                                 // Si existe
+        doc.revokedAt = new Date();                                              // Marca revocado
+        doc.revokedByIp = getClientMeta(req).ip;                                 // IP que revoca
+        await doc.save();                                                        // Persiste
       }
     }
-    clearRefreshCookie(res);                                                     // Limpia cookie en el cliente
-    return res.status(200).json({ ok: true, message: 'Sesión cerrada' });       // Responde OK
-  } catch (err) {                                                                // Captura error
-    return next(err);                                                            // Delega al manejador global
-  }                                                                              // Fin del catch
-};                                                                               // Fin de exports.logout
+    clearRefreshCookie(res);                                                     // Limpia cookie
+    return res.status(200).json({ ok: true, message: 'Sesión cerrada' });       // OK
+  } catch (err) {                                                                // Error
+    return next(err);                                                            // 5xx → handler global
+  }
+};
 
 // -----------------------------------------------------------------------------
-// POST /auth/logout-all                                                         // Endpoint para cerrar todas las sesiones
+// POST /auth/logout-all
 // -----------------------------------------------------------------------------
 /**
- * Requiere estar autenticado con Access JWT (usa tu authMiddleware).            // Condición
+ * Requiere Access JWT (middleware previo).
  * Efecto:
- *  - Revoca todos los refresh tokens del usuario en BD.                         // Acción en BD
- *  - Limpia cookie local.                                                       // Acción en cliente
+ *  - Revoca TODOS los refresh tokens activos del usuario.
+ *  - Limpia cookie local.
  */
-exports.logoutAll = async (req, res, next) => {                                  // Exporta handler logout-all (async)
-  try {                                                                          // Manejo de errores con try/catch
-    const uid = req.user?.id || req.user?._id;                                   // Obtiene id del usuario del access token
-    if (!uid) {                                                                  // Si no hay usuario en req
-      const err = new Error('No autenticado');                                   // Error semántico
-      err.status = 401;                                                          // 401 Unauthorized
-      throw err;                                                                 // Lanza error
+exports.logoutAll = async (req, res, next) => {                                  // Handler logout-all
+  try {                                                                          // Try/catch
+    const uid = req.user?.id || req.user?._id;                                   // Id del usuario (del JWT)
+    if (!uid) {                                                                  // Falta usuario
+      const err = new Error('No autenticado');                                   // Semántico
+      err.status = 401;                                                          // 401
+      throw err;                                                                 // Corta
     }
     await RefreshToken.updateMany(                                               // Revoca en masa
-      { user: uid, revokedAt: null },                                            // Filtra tokens activos del usuario
-      { $set: { revokedAt: new Date(), revokedByIp: getClientMeta(req).ip } }    // Setea marca de revocado e IP
-    );                                                                           // Fin de updateMany
+      { user: uid, revokedAt: null },                                            // RT activos del usuario
+      { $set: { revokedAt: new Date(), revokedByIp: getClientMeta(req).ip } }    // Marca revocados
+    );
     clearRefreshCookie(res);                                                     // Limpia cookie local
-    return res.status(200).json({ ok: true, message: 'Sesiones cerradas' });    // Responde OK
-  } catch (err) {                                                                // Captura error
-    return next(err);                                                            // Delega al manejador global
-  }                                                                              // Fin del catch
-};                                                                               // Fin de exports.logoutAll
+    return res.status(200).json({ ok: true, message: 'Sesiones cerradas' });    // OK
+  } catch (err) {                                                                // Error
+    return next(err);                                                            // 5xx → handler global
+  }
+};
