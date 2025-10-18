@@ -5,6 +5,7 @@
 
 const User = require('../models/User');                                            // Modelo User (colación ES + índice unique email)
 const Proyectos = require('../models/Proyectos');                                  // Modelo Proyectos (para RESTRICT y $pull en team)
+const RefreshToken = require('../models/RefreshToken');                            // 🔐 Modelo de RefreshToken (revocar sesiones al cambiar/resetear pass)
 const bcrypt = require('bcryptjs');                                                // Hash/compare de contraseñas
 const { sendPasswordResetEmail, sendWelcomeEmail } = require('../services/ServiceEmail'); // Envío de emails (best-effort)
 const crypto = require('crypto');                                                  // Generación de tokens aleatorios para reset
@@ -47,6 +48,7 @@ const toSafeUser = (doc) => {                                                   
   delete obj.resetToken;                                                           // Oculta token de reset
   delete obj.resetTokenExpires;                                                    // Oculta expiración de reset
   delete obj.token;                                                                // Oculta token persistente (legacy) si existiera
+  delete obj.failedLogin;                                                          // 🔐 Oculta estado/contadores de lockout
   return obj;                                                                      // Devuelve objeto seguro
 };                                                                                 // Fin toSafeUser
 
@@ -56,8 +58,9 @@ const toSafeUser = (doc) => {                                                   
 exports.register = async (req, res) => {                                           // Handler de registro
   const { firstName, lastName, email, phone, password } = req.body;                // Toma campos del body
 
-  if (!firstName || !lastName || !email || !phone || !password) {                  // Valida presencia de todos los campos
-    return res.status(400).json({ message: 'Todos los campos son obligatorios' }); // 400 si falta algo
+  // 📌 phone pasa a ser OPCIONAL (coherente con el tratamiento posterior)
+  if (!firstName || !lastName || !email || !password) {                            // Valida presencia mínima
+    return res.status(400).json({ message: 'Faltan campos obligatorios' });        // 400 si falta algo
   }                                                                                // Fin if
 
   if (!isValidEmail(email)) {                                                      // Valida formato de email
@@ -123,8 +126,10 @@ exports.forgotPassword = async (req, res) => {                                  
   try {                                                                            // Bloque principal
     const normalizedEmail = normalizeEmail(email);                                 // Normaliza email
     const user = await User.findOne({ email: normalizedEmail });                   // Busca usuario por email
+
+    // 🛡️ Anti-enumeración: respondemos 200 aunque no exista
     if (!user) {                                                                   // Si no existe
-      return res.status(404).json({ message: 'No existe una cuenta con ese correo' }); // 404
+      return res.status(200).json({ message: 'Si existe una cuenta, se envió el correo de recuperación' }); // 200 neutro
     }                                                                              // Fin if
 
     const token = crypto.randomBytes(32).toString('hex');                          // Genera token aleatorio
@@ -135,7 +140,7 @@ exports.forgotPassword = async (req, res) => {                                  
     await user.save();                                                             // Persiste cambios
 
     await sendPasswordResetEmail(user.email, token, expiresAt);                    // Envía email con link de reset
-    return res.status(200).json({ message: 'Correo de recuperación enviado con éxito' }); // 200 OK
+    return res.status(200).json({ message: 'Si existe una cuenta, se envió el correo de recuperación' }); // 200 OK (neutro)
   } catch (err) {                                                                  // Captura errores
     console.error('forgotPassword error:', err);                                   // Log técnico
     return res.status(500).json({ message: 'Error interno del servidor' });        // 500 genérico
@@ -167,7 +172,21 @@ exports.resetPassword = async (req, res) => {                                   
     user.password = hashedPassword;                                                // Asigna hash
     user.resetToken = null;                                                        // Limpia token
     user.resetTokenExpires = null;                                                 // Limpia expiración
+
+    // 🔒 Limpia contadores/bloqueos tras un reset exitoso
+    await user.resetLoginCounters();                                               // ← Mejora de UX/seguridad
+
     await user.save();                                                             // Persiste cambios
+
+    // 🔐 Seguridad: revoca TODAS las sesiones (refresh tokens) del usuario
+    try {                                                                          // Best-effort: no bloquear respuesta
+      await RefreshToken.updateMany(                                               // Revoca en masa
+        { user: user._id, revokedAt: null },                                       // Tokens activos del usuario
+        { $set: { revokedAt: new Date(), revokedByIp: (req.ip || req.connection?.remoteAddress || '') } }
+      );
+    } catch (revErr) {
+      console.warn('Advertencia: no se pudieron revocar todos los refresh tokens tras reset:', revErr);
+    }
 
     return res.status(200).json({ message: 'Contraseña actualizada correctamente' }); // 200 OK
   } catch (err) {                                                                  // Captura errores
@@ -182,7 +201,7 @@ exports.resetPassword = async (req, res) => {                                   
 exports.getUserProfile = async (req, res) => {                                     // Handler perfil
   try {                                                                            // Bloque principal
     const user = await User.findById(req.user.id)                                  // Busca por id del token
-      .select('-password -resetToken -resetTokenExpires -token');                  // Excluye campos sensibles
+      .select('-password -resetToken -resetTokenExpires -token -failedLogin');     // 🔐 Excluye campos sensibles/lockout
     if (!user) {                                                                   // Si no existe
       return res.status(404).json({ message: 'Usuario no encontrado' });           // 404
     }                                                                              // Fin if
@@ -254,7 +273,21 @@ exports.updateUserPassword = async (req, res) => {                              
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);                     // Hashea nueva contraseña
     user.password = hashedPassword;                                                // Asigna hash
+
+    // 🔒 Limpia contadores/bloqueos tras cambio de contraseña exitoso
+    await user.resetLoginCounters();                                               // ← IMPORTANTE para UX
+
     await user.save();                                                             // Persiste
+
+    // 🔐 Seguridad: revoca TODAS las sesiones (refresh tokens) del usuario
+    try {                                                                          // Best-effort: no bloquear respuesta
+      await RefreshToken.updateMany(                                               // Revoca en masa
+        { user: user._id, revokedAt: null },                                       // Tokens activos del usuario
+        { $set: { revokedAt: new Date(), revokedByIp: (req.ip || req.connection?.remoteAddress || '') } }
+      );
+    } catch (revErr) {
+      console.warn('Advertencia: no se pudieron revocar todos los refresh tokens tras cambio de contraseña:', revErr);
+    }
 
     return res.status(200).json({ message: 'Contraseña cambiada correctamente' }); // 200 OK
   } catch (error) {                                                                // Captura errores
@@ -269,7 +302,7 @@ exports.updateUserPassword = async (req, res) => {                              
 exports.getAllUsers = async (req, res) => {                                        // Handler listado
   try {                                                                            // Bloque principal
     const users = await User.find()                                                // Trae todos los usuarios
-      .select('-password -resetToken -resetTokenExpires -token');                  // Excluye sensibles
+      .select('-password -resetToken -resetTokenExpires -token -failedLogin');     // 🔐 Excluye sensibles/lockout
     return res.status(200).json(users);                                            // 200 con lista segura
   } catch (error) {                                                                // Captura errores
     console.error('Error al obtener usuarios:', error);                            // Log técnico
