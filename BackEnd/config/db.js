@@ -2,11 +2,11 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/Procivil_Manager', {
+    const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/SGPCMD', {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    console.log(`MONGO FUNCIONANDO`);
+    console.log(`MANGO FUNCIONANDO`);
   } catch (error) {
     console.error('Error al conectar MongoDB:', error);
     process.exit(1);

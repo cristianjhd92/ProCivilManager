@@ -17,8 +17,7 @@ export default function Login() {
       container.style.opacity = "0";
       container.style.transform = "translateY(30px)";
       setTimeout(() => {
-        container.style.transition =
-          "all 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
+        container.style.transition = "all 0.6s cubic-bezier(0.4, 0, 0.2, 1)";
         container.style.opacity = "1";
         container.style.transform = "translateY(0)";
       }, 100);
@@ -32,11 +31,11 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-  
+
     setLoading(true);
     setButtonText("Iniciando sesión...");
     setAlert(null);
-  
+
     try {
       const response = await fetch("http://localhost:5000/api/user/login", {
         method: "POST",
@@ -48,21 +47,25 @@ export default function Login() {
           password: formData.password,
         }),
       });
-  
+
       const data = await response.json();
-  
+
       if (!response.ok) {
         throw new Error(data.message || "Error en el inicio de sesión");
       }
-  
+
       // Guardar token y usuario en localStorage
       localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user)); // <--- Aquí
-  
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      // ✅ Notificación personalizada con nombre y rol
       setButtonText("✅ ¡Sesión iniciada!");
-      setAlert({ type: "success", message: data.message });
-  
-      // Redireccionar según ruta
+      setAlert({
+        type: "success",
+        message: `¡Inicio exitoso! Bienvenido ${data.user.firstName} (${data.user.role})`,
+      });
+
+      // Redireccionar después de 1s
       setTimeout(() => {
         window.location.href = data.redirectTo || "/";
       }, 1000);
@@ -73,19 +76,18 @@ export default function Login() {
       setLoading(false);
     }
   };
-  
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 overflow-hidden font-sans">
       {/* Grid Pattern Background */}
-      <div 
+      <div
         className="absolute inset-0 opacity-20"
         style={{
           backgroundImage: `
             linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
           `,
-          backgroundSize: '50px 50px'
+          backgroundSize: "50px 50px",
         }}
       />
 
@@ -93,7 +95,7 @@ export default function Login() {
       <div className="absolute w-72 h-72 top-[-10%] left-[-5%] bg-gradient-to-r from-orange-500/20 to-amber-500/20 rounded-full blur-3xl animate-[float_8s_ease-in-out_infinite]" />
       <div className="absolute w-96 h-96 top-[70%] right-[-10%] bg-gradient-to-r from-blue-500/15 to-purple-500/15 rounded-full blur-3xl animate-[float_10s_ease-in-out_infinite_2s]" />
       <div className="absolute w-48 h-48 bottom-[10%] left-[80%] bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-full blur-2xl animate-[float_6s_ease-in-out_infinite_4s]" />
-      
+
       {/* Subtle geometric shapes */}
       <div className="absolute top-1/4 right-1/4 w-2 h-2 bg-orange-400 rounded-full animate-pulse opacity-60" />
       <div className="absolute bottom-1/3 left-1/5 w-1 h-1 bg-blue-400 rounded-full animate-pulse opacity-40 delay-1000" />
@@ -101,21 +103,17 @@ export default function Login() {
 
       {/* Login Container */}
       <div className="login-container relative z-10 w-[480px] max-w-[90vw]">
-        {/* Glass Card */}
         <div className="bg-white/[0.02] backdrop-blur-2xl border border-white/10 rounded-3xl p-12 shadow-2xl relative overflow-hidden">
-          {/* Inner glow effect */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] via-transparent to-transparent rounded-3xl" />
-          
-          {/* Content */}
+
           <div className="relative z-10">
-            {/* Logo Section */}
             <div className="text-center mb-12">
               <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl mb-6 shadow-2xl">
                 <span className="text-white font-bold text-2xl">SG</span>
               </div>
               <h1 className="text-4xl font-black text-white mb-2">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-500">
-                  Procivil Manager
+                  SGPCMD
                 </span>
               </h1>
               <p className="text-gray-400 text-lg font-medium">
@@ -124,7 +122,6 @@ export default function Login() {
               <div className="w-16 h-px bg-gradient-to-r from-transparent via-orange-500 to-transparent mx-auto mt-4" />
             </div>
 
-            {/* Welcome Text */}
             <div className="text-center mb-10">
               <h2 className="text-3xl font-bold text-white mb-3">Bienvenido de vuelta</h2>
               <p className="text-gray-400 text-lg leading-relaxed">
@@ -132,7 +129,7 @@ export default function Login() {
               </p>
             </div>
 
-            {/* Alert */}
+            {/* ✅ Alerta */}
             {alert && (
               <div
                 className={`p-4 rounded-2xl mb-8 text-sm font-medium border backdrop-blur-sm transition-all duration-300 ${
@@ -142,17 +139,18 @@ export default function Login() {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${
-                    alert.type === "error" ? "bg-red-400" : "bg-emerald-400"
-                  }`} />
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      alert.type === "error" ? "bg-red-400" : "bg-emerald-400"
+                    }`}
+                  />
                   {alert.message}
                 </div>
               </div>
             )}
 
-            {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Email Field */}
+              {/* Email */}
               <div className="space-y-2">
                 <label className="block text-sm font-bold text-gray-300 tracking-wider uppercase">
                   Correo electrónico
@@ -171,7 +169,7 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Password Field */}
+              {/* Password */}
               <div className="space-y-2">
                 <label className="block text-sm font-bold text-gray-300 tracking-wider uppercase">
                   Contraseña
@@ -197,13 +195,12 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Options */}
               <div className="flex justify-between items-center text-sm pt-2">
                 <label className="flex items-center gap-3 text-gray-300 cursor-pointer group">
                   <div className="relative">
-                    <input 
-                      type="checkbox" 
-                      id="remember" 
+                    <input
+                      type="checkbox"
+                      id="remember"
                       className="w-5 h-5 opacity-0 absolute"
                     />
                     <div className="w-5 h-5 border-2 border-white/20 rounded bg-white/5 group-hover:border-orange-500/50 transition-colors duration-200" />
@@ -211,8 +208,8 @@ export default function Login() {
                   </div>
                   <span className="font-medium">Recordarme</span>
                 </label>
-                <a 
-                  href="/recuperar" 
+                <a
+                  href="/recuperar"
                   className="text-orange-400 hover:text-orange-300 font-bold transition-colors duration-200 hover:underline"
                 >
                   ¿Olvidaste tu contraseña?
@@ -229,18 +226,15 @@ export default function Login() {
                     : "hover:shadow-2xl hover:shadow-orange-500/25 active:scale-[0.98]"
                 }`}
               >
-                {/* Button Background */}
                 <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-amber-600 transition-all duration-300" />
                 <div className="absolute inset-0 bg-gradient-to-r from-orange-600 to-amber-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                
-                {/* Loading Animation */}
+
                 {loading && (
                   <div className="absolute inset-0 bg-gradient-to-r from-orange-500/50 to-amber-600/50">
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
                   </div>
                 )}
-                
-                {/* Button Content */}
+
                 <span className="relative z-10 flex items-center justify-center gap-3">
                   {loading && (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -250,12 +244,23 @@ export default function Login() {
               </button>
             </form>
 
-            {/* Signup Link */}
+            {/* ✅ Botón de volver al inicio */}
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => (window.location.href = "/")}
+                className="text-orange-400 hover:text-orange-300 font-bold transition-colors duration-200 hover:underline"
+              >
+                ← Volver al inicio
+              </button>
+            </div>
+
+            {/* Registro */}
             <div className="text-center mt-10 pt-8 border-t border-white/10">
               <p className="text-gray-400 text-lg">
                 ¿No tienes una cuenta?{" "}
-                <a 
-                  href="/register" 
+                <a
+                  href="/register"
                   className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-500 font-bold hover:from-orange-300 hover:to-amber-400 transition-all duration-200"
                 >
                   Regístrate aquí
@@ -264,21 +269,30 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Decorative Elements */}
+          {/* Decorativos */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-orange-500/10 to-transparent rounded-full -translate-y-16 translate-x-16" />
           <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-blue-500/10 to-transparent rounded-full translate-y-20 -translate-x-20" />
         </div>
       </div>
 
-      {/* Custom Styles */}
+      {/* Estilos personalizados */}
       <style jsx>{`
         @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-20px) rotate(180deg); }
+          0%,
+          100% {
+            transform: translateY(0px) rotate(0deg);
+          }
+          50% {
+            transform: translateY(-20px) rotate(180deg);
+          }
         }
         @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
         }
         .animate-shimmer {
           animation: shimmer 2s infinite;

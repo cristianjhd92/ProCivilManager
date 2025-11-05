@@ -176,7 +176,7 @@ export default function Register() {
               <h1 className="text-4xl lg:text-5xl font-black text-white mb-3">
                 Únete a{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-500">
-                  Procivil Manager
+                  SGPCMD
                 </span>
               </h1>
               <p className="text-gray-400 text-lg lg:text-xl leading-relaxed max-w-lg mx-auto">
@@ -366,7 +366,7 @@ export default function Register() {
                   <a href="#" className="text-orange-400 hover:text-orange-300 font-bold transition-colors duration-200 hover:underline">
                     política de privacidad
                   </a>{" "}
-                  de Procivil Manager
+                  de SGPCMD
                 </label>
               </div>
 
@@ -421,6 +421,16 @@ export default function Register() {
                 </button>
               </div>
             </form>
+
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => (window.location.href = "/")}
+                className="text-orange-400 hover:text-orange-300 font-bold transition-colors duration-200 hover:underline"
+              >
+                ← Volver al inicio
+              </button>
+            </div>
 
             {/* Login Link */}
             <div className="text-center mt-10 pt-8 border-t border-white/10">

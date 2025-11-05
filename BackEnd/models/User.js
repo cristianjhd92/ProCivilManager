@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema(
     token:     { type: String, default: null },
     resetToken: { type: String, default: null },
     resetTokenExpires: { type: Date, default: null },
+    loginAttempts: { type: Number, default: 0 },
+    status: { type: Boolean, default: true } // true = activa, false = bloqueada
   },
   { timestamps: true }
 );

@@ -16,7 +16,7 @@ const sendPasswordResetEmail = async (to, token, expiresAt) => {
     <div style="font-family:sans-serif;padding:30px;background-color:#f4f4f4">
       <div style="max-width:600px;margin:0 auto;background:white;border-radius:8px;overflow:hidden">
         <div style="background-color:#0a4974;color:white;padding:20px;text-align:center;font-weight:bold;font-size:20px">
-          Procivil Manager
+          SGPCMD
         </div>
         <div style="padding:30px;text-align:center">
           <h2 style="color:#333">Recuperación de contraseña</h2>
@@ -31,7 +31,7 @@ const sendPasswordResetEmail = async (to, token, expiresAt) => {
           </div>
         </div>
         <div style="background:#f1f1f1;padding:20px;text-align:center;font-size:12px;color:#888">
-          © 2025 Procivil Manager. Todos los derechos reservados.<br />
+          © 2025 SGPCMD. Todos los derechos reservados.<br />
           ¿Necesitas ayuda? <a href="mailto:construserviciosmdcolombia@gmail.com">construserviciosmdcolombia@gmail.com</a>
         </div>
       </div>
@@ -39,7 +39,7 @@ const sendPasswordResetEmail = async (to, token, expiresAt) => {
   `;
 
   await transporter.sendMail({
-    from: '"Procivil Manager" <construserviciosmdcolombia@gmail.com>',
+    from: '"SGPCMD" <construserviciosmdcolombia@gmail.com>',
     to,
     subject: "Recuperación de contraseña",
     html,
@@ -55,7 +55,7 @@ const sendContactNotification = async (contactData) => {
     <div style="font-family:sans-serif;padding:30px;background-color:#f4f4f4">
       <div style="max-width:600px;margin:0 auto;background:white;border-radius:8px;overflow:hidden">
         <div style="background-color:#0a4974;color:white;padding:20px;text-align:center;font-weight:bold;font-size:20px">
-          Procivil Manager
+          SGPCMD
         </div>
         <div style="padding:30px">
           <h2 style="color:#333;text-align:center">Nuevo mensaje de contacto</h2>
@@ -67,9 +67,9 @@ const sendContactNotification = async (contactData) => {
           </div>
         </div>
         <div style="background:#f1f1f1;padding:20px;text-align:center;font-size:12px;color:#888">
-          Este mensaje fue generado automáticamente desde el formulario de contacto de Procivil Manager.<br />
+          Este mensaje fue generado automáticamente desde el formulario de contacto de SGPCMD.<br />
           ¿Necesitas ayuda? <a href="mailto:construserviciosmdcolombia@gmail.com">construserviciosmdcolombia@gmail.com</a><br />
-          © 2025 Procivil Manager. Todos los derechos reservados.
+          © 2025 SGPCMD. Todos los derechos reservados.
         </div>
       </div>
     </div>
@@ -77,7 +77,7 @@ const sendContactNotification = async (contactData) => {
 
   try {
     const info = await transporter.sendMail({
-      from: '"Procivil Manager Contacto" <construserviciosmdcolombia@gmail.com>',
+      from: '"SGPCMD Contacto" <construserviciosmdcolombia@gmail.com>',
       to: `${email}, contacto@gestionproyectos.com`, // envía a ambos
       subject: 'Nuevo mensaje de contacto',
       html,
@@ -95,11 +95,11 @@ const sendWelcomeEmail = async (to, name) => {
     <div style="font-family:sans-serif;padding:30px;background-color:#f4f4f4">
       <div style="max-width:600px;margin:0 auto;background:white;border-radius:8px;overflow:hidden">
         <div style="background-color:#0a4974;color:white;padding:20px;text-align:center;font-weight:bold;font-size:20px">
-          Procivil Manager
+          SGPCMD
         </div>
         <div style="padding:30px;text-align:center">
           <h2 style="color:#333">¡Bienvenido/a, ${name}!</h2>
-          <p>Tu correo fue utilizado para crear una cuenta en nuestra plataforma Procivil Manager.</p>
+          <p>Tu correo fue utilizado para crear una cuenta en nuestra plataforma SGPCMD.</p>
           <p>Si tú hiciste este registro, no necesitas hacer nada más. Si no fuiste tú, por favor contáctanos de inmediato.</p>
           <div style="margin-top:30px;padding:10px;font-size:12px;color:#555;background:#e0e0e0">
             <b>Correo:</b> ${to}<br/>
@@ -107,7 +107,7 @@ const sendWelcomeEmail = async (to, name) => {
           </div>
         </div>
         <div style="background:#f1f1f1;padding:20px;text-align:center;font-size:12px;color:#888">
-          © 2025 Procivil Manager. Todos los derechos reservados.<br />
+          © 2025 SGPCMD. Todos los derechos reservados.<br />
           ¿Necesitas ayuda? <a href="mailto:construserviciosmdcolombia@gmail.com">construserviciosmdcolombia@gmail.com</a>
         </div>
       </div>
@@ -115,9 +115,9 @@ const sendWelcomeEmail = async (to, name) => {
   `;
 
   await transporter.sendMail({
-    from: '"Procivil Manager" <construserviciosmdcolombia@gmail.com>',
+    from: '"SGPCMD" <construserviciosmdcolombia@gmail.com>',
     to,
-    subject: 'Bienvenido/a a Procivil Manager',
+    subject: 'Bienvenido/a a SGPCMD',
     html,
   });
 };
@@ -130,7 +130,7 @@ const sendProjectRequestEmail = async (projectData) => {
     <div style="font-family:sans-serif;padding:30px;background-color:#f4f4f4">
       <div style="max-width:600px;margin:0 auto;background:white;border-radius:8px;overflow:hidden">
         <div style="background-color:#0a4974;color:white;padding:20px;text-align:center;font-weight:bold;font-size:20px">
-          Procivil Manager - Nueva solicitud de proyecto
+          SGPCMD - Nueva solicitud de proyecto
         </div>
         <div style="padding:30px">
           <h2 style="color:#333;text-align:center">Detalles del proyecto solicitado</h2>
@@ -144,9 +144,9 @@ const sendProjectRequestEmail = async (projectData) => {
           </div>
         </div>
         <div style="background:#f1f1f1;padding:20px;text-align:center;font-size:12px;color:#888">
-          Este mensaje fue generado automáticamente desde el formulario de solicitud de proyecto en Procivil Manager.<br />
+          Este mensaje fue generado automáticamente desde el formulario de solicitud de proyecto en SGPCMD.<br />
           ¿Necesitas ayuda? <a href="mailto:construserviciosmdcolombia@gmail.com">construserviciosmdcolombia@gmail.com</a><br />
-          © 2025 Procivil Manager. Todos los derechos reservados.
+          © 2025 SGPCMD. Todos los derechos reservados.
         </div>
       </div>
     </div>
@@ -154,7 +154,7 @@ const sendProjectRequestEmail = async (projectData) => {
 
   try {
     const info = await transporter.sendMail({
-      from: '"Procivil Manager - Solicitudes" <construserviciosmdcolombia@gmail.com>',
+      from: '"SGPCMD - Solicitudes" <construserviciosmdcolombia@gmail.com>',
       to: `${email}, contacto@gestionproyectos.com`, // ⚠️ Aquí se envía a ambos: usuario y admin
       subject: 'Nueva solicitud de proyecto',
       html,

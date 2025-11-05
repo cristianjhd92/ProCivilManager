@@ -1,0 +1,30 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start_api": "json-server --watch db.json --port 4001",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "faker": "^6.6.6",
+    "fs": "^0.0.1-security",
+    "jsonwebtoken": "^9.0.2",
+    "jspdf": "^3.0.2",
+    "jspdf-autotable": "^5.0.2",
+    "jwt-decode": "^4.0.0",
+    "mongoose": "^8.7.3",
+    "nodemailer": "^6.9.15",
+    "pdfkit": "^0.17.2",
+    "socket.io": "^4.8.1"
+  }
+}
